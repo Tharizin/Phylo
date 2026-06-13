@@ -63,8 +63,8 @@ export default async function DashboardPage() {
   const weeklyPoints = (weekLogs ?? []).reduce((a, l) => a + Number(l.points_awarded ?? 0), 0);
   const allTimePoints = (allLogs ?? []).reduce((a, l) => a + Number(l.points_awarded ?? 0), 0);
 
-  const thisWeekSpeciesIds = [...new Set((weekLogs ?? []).map((l) => l.species_id as string))];
-  const prevWeekSpeciesIds = [...new Set((prevWeekLogs ?? []).map((l) => l.species_id as string))];
+  const thisWeekSpeciesIds = Array.from(new Set((weekLogs ?? []).map((l) => l.species_id as string)));
+  const prevWeekSpeciesIds = Array.from(new Set((prevWeekLogs ?? []).map((l) => l.species_id as string)));
   const diversity = diversityNewSpeciesPct(thisWeekSpeciesIds, prevWeekSpeciesIds);
   const diversityQualified = diversity.pct >= 0.15;
   const hasDiversityBonus = (weekLogs ?? []).some((l) => Number(l.diversity_multiplier ?? 1) >= 1.5);

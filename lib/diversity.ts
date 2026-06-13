@@ -22,7 +22,7 @@ export function diversityNewSpeciesPct(
   prevWeekSpecies: string[]
 ): { newCount: number; thisCount: number; pct: number } {
   const prev = new Set(prevWeekSpecies);
-  const unique = [...new Set(thisWeekSpecies)];
+  const unique = Array.from(new Set(thisWeekSpecies));
   const newCount = unique.filter((s) => !prev.has(s)).length;
   const thisCount = unique.length;
   const pct = thisCount === 0 ? 0 : newCount / thisCount;

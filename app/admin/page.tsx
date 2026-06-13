@@ -39,7 +39,7 @@ export default async function AdminPage() {
     );
   }
 
-  const userIds = [...new Set((logs ?? []).map((l) => l.user_id as string))];
+  const userIds = Array.from(new Set((logs ?? []).map((l) => l.user_id as string)));
   const { data: profiles } = await supabase.from("profiles").select("id, username").in("id", userIds);
 
   const { data: species, error: spErr } = await supabase.from("species").select("*").order("common_name", { ascending: true });
