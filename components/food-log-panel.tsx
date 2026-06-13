@@ -85,6 +85,9 @@ export function FoodLogPanel() {
   }, []);
 
   useEffect(() => {
+    if (query.trim()) {
+      setLoading(true);
+    }
     const t = setTimeout(() => {
       void runSearch(query);
     }, 220);
@@ -222,20 +225,22 @@ export function FoodLogPanel() {
                     )}
                   </CommandEmpty>
                   <CommandGroup heading="Species">
-                    {results.map((s) => (
-                      <CommandItem
-                        key={s.id}
-                        value={s.id}
-                        onSelect={() => {
-                          setSelected(s);
-                          setOpen(false);
-                        }}
-                        className="flex flex-col items-start gap-0.5 py-3"
-                      >
-                        <SpeciesNames commonName={s.common_name} latinName={s.latin_name} />
-                        <p className="text-xs capitalize text-muted-foreground">{s.category}</p>
-                      </CommandItem>
-                    ))}
+                    {loading && query.trim() ? null : (
+                      results.map((s) => (
+                        <CommandItem
+                          key={s.id}
+                          value={s.id}
+                          onSelect={() => {
+                            setSelected(s);
+                            setOpen(false);
+                          }}
+                          className="flex flex-col items-start gap-0.5 py-3"
+                        >
+                          <SpeciesNames commonName={s.common_name} latinName={s.latin_name} />
+                          <p className="text-xs capitalize text-muted-foreground">{s.category}</p>
+                        </CommandItem>
+                      ))
+                    )}
                   </CommandGroup>
                 </CommandList>
               </Command>

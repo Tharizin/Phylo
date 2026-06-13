@@ -154,9 +154,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-3xl font-semibold sm:text-4xl">Dashboard</h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
-          Weekly window resets every <span className="font-medium text-foreground">Sunday 00:00 UTC</span>. First time
-          ever: +2 plants/fungi, +1 animals. First time each week: +0.10 plants/fungi, +0.05 animals. Repeats in the same
-          week earn 0. A 5-day streak gives 1.25×; 15%+ new species vs. last week earns 1.5× at week end.{" "}
+          Eat diversely, earn points.{" "}
           <a href="/help" className="text-primary underline-offset-4 hover:underline">
             How it works
           </a>

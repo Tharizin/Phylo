@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError } from "@/lib/supabase/errors";
+import { rankSpeciesSearchResults } from "@/lib/species-search";
 
 export type SpeciesSearchRow = {
   id: string;
@@ -10,6 +11,20 @@ export type SpeciesSearchRow = {
   latin_name: string | null;
   category: string;
 };
+
+type SpeciesSearchDbRow = SpeciesSearchRow & {
+  alternative_names?: string[] | null;
+};
+
+function toSearchRows(rows: SpeciesSearchDbRow[], term: string): SpeciesSearchRow[] {
+  const ranked = rankSpeciesSearchResults(rows, term);
+  return ranked.map((row) => ({
+    id: row.id,
+    common_name: row.common_name,
+    latin_name: row.latin_name,
+    category: row.category,
+  }));
+}
 
 function parseAlternativeNames(raw: string): string[] {
   return raw
@@ -70,21 +85,16 @@ export async function searchSpeciesAction(
   if (!error) {
     return {
       ok: true,
-      results: ((data ?? []) as SpeciesSearchRow[]).map((row) => ({
-        id: row.id,
-        common_name: row.common_name,
-        latin_name: row.latin_name,
-        category: row.category,
-      })),
+      results: toSearchRows((data ?? []) as SpeciesSearchDbRow[], term).slice(0, capped),
     };
   }
 
   // Fallback when RPC is unavailable (e.g. migration not yet applied)
   let q = supabase
     .from("species")
-    .select("id, common_name, latin_name, category")
+    .select("id, common_name, latin_name, category, alternative_names")
     .order("common_name", { ascending: true })
-    .limit(capped);
+    .limit(100);
 
   if (term) {
     const pattern = `%${term}%`;
@@ -93,7 +103,21 @@ export async function searchSpeciesAction(
 
   const { data: fallback, error: fbErr } = await q;
   if (fbErr) return { ok: false, error: fbErr.message };
-  return { ok: true, results: (fallback ?? []) as SpeciesSearchRow[] };
+
+  const fallbackRows = (fallback ?? []) as SpeciesSearchDbRow[];
+  const altMatches =
+    term.length > 0
+      ? fallbackRows.filter((row) =>
+          (row.alternative_names ?? []).some((alt) => alt.toLowerCase().includes(term.toLowerCase()))
+        )
+      : [];
+
+  const merged = new Map<string, SpeciesSearchDbRow>();
+  for (const row of [...fallbackRows, ...altMatches]) {
+    merged.set(row.id, row);
+  }
+
+  return { ok: true, results: toSearchRows(Array.from(merged.values()), term).slice(0, capped) };
 }
 
 export async function addAlternativeNameAction(
