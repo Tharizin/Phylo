@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AlertTriangle, Flame, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeSpeciesJoin } from "@/lib/supabase/relations";
 import { ensureDiversityProcessedAction } from "@/app/actions/diversity";
 import { FoodLogPanel } from "@/components/food-log-panel";
 import { RecentLogs } from "@/components/recent-logs";
@@ -24,8 +25,14 @@ export default async function DashboardPage() {
   const wkEnd = weekEndExclusiveUtc();
   const prevWkStart = new Date(wkStart.getTime() - 7 * 86400000);
 
-  let weekLogs: { species_id: string; points_awarded: number; logged_at: string; diversity_multiplier?: number }[] | null =
-    null;
+  type WeekLogRow = {
+    species_id: string;
+    points_awarded: number;
+    logged_at: string;
+    diversity_multiplier?: number;
+  };
+
+  let weekLogs: WeekLogRow[] = [];
   const weekWithDiv = await supabase
     .from("food_logs")
     .select("species_id, points_awarded, logged_at, diversity_multiplier")
@@ -34,7 +41,7 @@ export default async function DashboardPage() {
     .lt("logged_at", wkEnd.toISOString());
 
   if (!weekWithDiv.error) {
-    weekLogs = weekWithDiv.data as typeof weekLogs;
+    weekLogs = (weekWithDiv.data ?? []) as WeekLogRow[];
   } else {
     const weekBasic = await supabase
       .from("food_logs")
@@ -42,7 +49,7 @@ export default async function DashboardPage() {
       .eq("user_id", user.id)
       .gte("logged_at", wkStart.toISOString())
       .lt("logged_at", wkEnd.toISOString());
-    weekLogs = weekBasic.data as typeof weekLogs;
+    weekLogs = (weekBasic.data ?? []) as WeekLogRow[];
   }
 
   const { data: prevWeekLogs } = await supabase
@@ -57,17 +64,17 @@ export default async function DashboardPage() {
     .select("species_id, points_awarded, logged_at")
     .eq("user_id", user.id);
 
-  const weeklySpecies = new Set((weekLogs ?? []).map((l) => l.species_id)).size;
+  const weeklySpecies = new Set(weekLogs.map((l) => l.species_id)).size;
   const allTimeSpecies = new Set((allLogs ?? []).map((l) => l.species_id)).size;
 
-  const weeklyPoints = (weekLogs ?? []).reduce((a, l) => a + Number(l.points_awarded ?? 0), 0);
+  const weeklyPoints = weekLogs.reduce((a, l) => a + Number(l.points_awarded ?? 0), 0);
   const allTimePoints = (allLogs ?? []).reduce((a, l) => a + Number(l.points_awarded ?? 0), 0);
 
-  const thisWeekSpeciesIds = Array.from(new Set((weekLogs ?? []).map((l) => l.species_id as string)));
+  const thisWeekSpeciesIds = Array.from(new Set(weekLogs.map((l) => l.species_id)));
   const prevWeekSpeciesIds = Array.from(new Set((prevWeekLogs ?? []).map((l) => l.species_id as string)));
   const diversity = diversityNewSpeciesPct(thisWeekSpeciesIds, prevWeekSpeciesIds);
   const diversityQualified = diversity.pct >= 0.15;
-  const hasDiversityBonus = (weekLogs ?? []).some((l) => Number(l.diversity_multiplier ?? 1) >= 1.5);
+  const hasDiversityBonus = weekLogs.some((l) => Number(l.diversity_multiplier ?? 1) >= 1.5);
 
   const since7 = new Date(Date.now() - 7 * 86400000);
   const { data: logs7 } = await supabase
@@ -80,15 +87,15 @@ export default async function DashboardPage() {
   const counts = new Map<string, { n: number; name: string }>();
   for (const row of logs7 ?? []) {
     const sid = row.species_id as string;
-    const sp = row.species as { common_name: string; latin_name: string | null } | null;
+    const sp = normalizeSpeciesJoin(row.species);
     const prev = counts.get(sid);
-    const name = sp?.common_name ?? "Unknown";
+    const name = sp.common_name;
     counts.set(sid, { n: (prev?.n ?? 0) + 1, name });
   }
   const overrelianceCandidates =
     total7 === 0
       ? []
-      : [...counts.entries()]
+      : Array.from(counts.entries())
           .map(([speciesId, v]) => ({
             speciesId,
             name: v.name,
@@ -294,11 +301,7 @@ export default async function DashboardPage() {
                   logged_at: r.logged_at as string,
                   points_awarded: Number(r.points_awarded),
                   notes: (r.notes as string | null) ?? null,
-                  species: r.species as {
-                    common_name: string;
-                    latin_name: string | null;
-                    category: string;
-                  },
+                  species: normalizeSpeciesJoin(r.species),
                 })) ?? []
               }
             />

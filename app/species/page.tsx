@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeSpeciesJoin } from "@/lib/supabase/relations";
 import { AllTimeSpeciesTable } from "@/components/all-time-species-table";
 
 export default async function SpeciesPage() {
@@ -29,21 +30,17 @@ export default async function SpeciesPage() {
 
   for (const row of logs ?? []) {
     const sid = row.species_id as string;
-    const sp = row.species as {
-      common_name: string;
-      latin_name: string | null;
-      category: string;
-    } | null;
+    const sp = normalizeSpeciesJoin(row.species);
     const prev = counts.get(sid);
     counts.set(sid, {
       log_count: (prev?.log_count ?? 0) + 1,
-      common_name: sp?.common_name ?? "Unknown",
-      latin_name: sp?.latin_name ?? null,
-      category: sp?.category ?? "other",
+      common_name: sp.common_name,
+      latin_name: sp.latin_name,
+      category: sp.category,
     });
   }
 
-  const rows = [...counts.entries()].map(([species_id, v]) => ({
+  const rows = Array.from(counts.entries()).map(([species_id, v]) => ({
     species_id,
     log_count: v.log_count,
     common_name: v.common_name,

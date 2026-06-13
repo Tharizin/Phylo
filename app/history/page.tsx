@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeSpeciesJoin } from "@/lib/supabase/relations";
 import { HistoryTable } from "@/components/history-table";
 
 export default async function HistoryPage() {
@@ -35,12 +36,7 @@ export default async function HistoryPage() {
           logged_at: row.logged_at as string,
           notes: (row.notes as string | null) ?? null,
           points_awarded: Number(row.points_awarded),
-          species: row.species as {
-            id: string;
-            common_name: string;
-            latin_name: string | null;
-            category: string;
-          },
+          species: normalizeSpeciesJoin(row.species),
         }))}
       />
     </div>
