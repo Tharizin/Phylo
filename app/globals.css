@@ -1,0 +1,72 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,400&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 20% 97%;
+    --foreground: 200 10% 12%;
+    --card: 40 18% 98%;
+    --card-foreground: 200 10% 12%;
+    --popover: 40 18% 98%;
+    --popover-foreground: 200 10% 12%;
+    --primary: 142 22% 42%;
+    --primary-foreground: 40 25% 98%;
+    --secondary: 40 12% 92%;
+    --secondary-foreground: 200 10% 18%;
+    --muted: 40 10% 90%;
+    --muted-foreground: 200 6% 38%;
+    --accent: 142 18% 88%;
+    --accent-foreground: 142 30% 22%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 40 10% 86%;
+    --input: 40 10% 86%;
+    --ring: 142 22% 42%;
+    --radius: 0.65rem;
+    --sage: 142 22% 42%;
+    --sage-muted: 142 14% 72%;
+  }
+
+  .dark {
+    --background: 210 12% 9%;
+    --foreground: 40 15% 94%;
+    --card: 210 11% 11%;
+    --card-foreground: 40 15% 94%;
+    --popover: 210 11% 11%;
+    --popover-foreground: 40 15% 94%;
+    --primary: 142 20% 48%;
+    --primary-foreground: 210 12% 8%;
+    --secondary: 210 10% 16%;
+    --secondary-foreground: 40 12% 92%;
+    --muted: 210 8% 18%;
+    --muted-foreground: 40 8% 68%;
+    --accent: 142 12% 18%;
+    --accent-foreground: 142 25% 88%;
+    --destructive: 0 62% 42%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 210 8% 18%;
+    --input: 210 8% 18%;
+    --ring: 142 22% 48%;
+    --sage: 142 22% 48%;
+    --sage-muted: 142 10% 32%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "DM Sans", system-ui, sans-serif;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: "Fraunces", "DM Sans", serif;
+    @apply tracking-tight;
+  }
+}
