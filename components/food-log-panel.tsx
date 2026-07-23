@@ -108,7 +108,7 @@ export function FoodLogPanel() {
   }, [query, runSearch]);
 
   useEffect(() => {
-    if (!aliasSuggestOpen) return;
+    if (!aliasSuggestOpen || aliasTarget) return;
     const t = setTimeout(async () => {
       setAliasSpeciesLoading(true);
       const res = await searchSpeciesAction(aliasSpeciesQuery, 20);
@@ -117,7 +117,7 @@ export function FoodLogPanel() {
       else setAliasSpeciesResults([]);
     }, 220);
     return () => clearTimeout(t);
-  }, [aliasSpeciesQuery, aliasSuggestOpen]);
+  }, [aliasSpeciesQuery, aliasSuggestOpen, aliasTarget]);
 
   useEffect(() => {
     if (!speciesSuggestOpen) {
@@ -222,6 +222,13 @@ export function FoodLogPanel() {
     setAliasTarget(null);
     setAliasInput("");
     setAliasSpeciesQuery("");
+    setAliasSpeciesResults([]);
+  }
+
+  function clearAliasTarget() {
+    setAliasTarget(null);
+    setAliasSpeciesQuery("");
+    setAliasSpeciesResults([]);
   }
 
   function openSpeciesSuggest() {
@@ -234,6 +241,7 @@ export function FoodLogPanel() {
     setOpen(false);
     setAliasInput(query.trim());
     setAliasSpeciesQuery("");
+    setAliasSpeciesResults([]);
     setAliasTarget(null);
     setAliasSuggestOpen(true);
   }
@@ -415,7 +423,18 @@ export function FoodLogPanel() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={aliasSuggestOpen} onOpenChange={setAliasSuggestOpen}>
+      <Dialog
+        open={aliasSuggestOpen}
+        onOpenChange={(o) => {
+          setAliasSuggestOpen(o);
+          if (!o) {
+            setAliasTarget(null);
+            setAliasInput("");
+            setAliasSpeciesQuery("");
+            setAliasSpeciesResults([]);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Suggest an alias</DialogTitle>
@@ -425,59 +444,68 @@ export function FoodLogPanel() {
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label>Find species</Label>
+              <Label htmlFor="alias-species">Existing species</Label>
               {aliasTarget ? (
-                <div className="rounded-md border bg-muted/30 px-3 py-2">
-                  <p className="text-xs text-muted-foreground">Selected</p>
+                <button
+                  type="button"
+                  onClick={clearAliasTarget}
+                  className="w-full rounded-md border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <p className="text-xs text-muted-foreground">Selected — click to change</p>
                   <SpeciesNames commonName={aliasTarget.common_name} latinName={aliasTarget.latin_name} />
-                </div>
-              ) : null}
-              <Command shouldFilter={false} className="rounded-md border">
-                <CommandInput
-                  placeholder="Search existing species…"
-                  value={aliasSpeciesQuery}
-                  onValueChange={setAliasSpeciesQuery}
-                />
-                <CommandList>
-                  <CommandEmpty className="py-4 text-center text-sm text-muted-foreground">
-                    {aliasSpeciesLoading ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Searching…
-                      </span>
-                    ) : (
-                      "Type to search species."
-                    )}
-                  </CommandEmpty>
-                  <CommandGroup>
-                    {!aliasSpeciesLoading &&
-                      aliasSpeciesResults.map((s) => (
-                        <CommandItem
+                </button>
+              ) : (
+                <>
+                  <Input
+                    id="alias-species"
+                    value={aliasSpeciesQuery}
+                    onChange={(e) => setAliasSpeciesQuery(e.target.value)}
+                    placeholder="Search and select a species…"
+                    autoFocus
+                  />
+                  {aliasSpeciesLoading ? (
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Searching…
+                    </p>
+                  ) : aliasSpeciesQuery.trim() && aliasSpeciesResults.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No species found.</p>
+                  ) : aliasSpeciesResults.length > 0 ? (
+                    <div className="max-h-44 overflow-y-auto rounded-md border">
+                      {aliasSpeciesResults.map((s) => (
+                        <button
                           key={s.id}
-                          value={s.id}
-                          onSelect={() => setAliasTarget(s)}
+                          type="button"
+                          className="w-full border-b px-3 py-2 text-left last:border-0 hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
                           onMouseDown={(e) => e.preventDefault()}
-                          className={`flex cursor-pointer flex-col items-start gap-0.5 py-3 ${
-                            aliasTarget?.id === s.id ? "bg-accent" : ""
-                          }`}
+                          onClick={() => {
+                            setAliasTarget(s);
+                            setAliasSpeciesQuery("");
+                            setAliasSpeciesResults([]);
+                          }}
                         >
                           <SpeciesNames commonName={s.common_name} latinName={s.latin_name} />
                           <p className="text-xs capitalize text-muted-foreground">{s.category}</p>
-                        </CommandItem>
+                        </button>
                       ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Type to search the catalog.</p>
+                  )}
+                </>
+              )}
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="alias-input">Suggested alias</Label>
-              <Input
-                id="alias-input"
-                value={aliasInput}
-                onChange={(e) => setAliasInput(e.target.value)}
-                placeholder="e.g. rocket"
-              />
-            </div>
+            {aliasTarget ? (
+              <div className="grid gap-2">
+                <Label htmlFor="alias-input">Suggested alias</Label>
+                <Input
+                  id="alias-input"
+                  value={aliasInput}
+                  onChange={(e) => setAliasInput(e.target.value)}
+                  placeholder="e.g. rocket"
+                />
+              </div>
+            ) : null}
           </div>
           <DialogFooter>
             <Button
