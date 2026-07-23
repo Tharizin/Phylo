@@ -196,25 +196,34 @@ export function FoodLogPanel() {
   }
 
   function openSpeciesSuggest() {
+    setOpen(false);
     if (query.trim()) setNewCommon(query.trim());
     setSpeciesSuggestOpen(true);
   }
 
   function openAliasSuggest() {
+    setOpen(false);
     setAliasInput(query.trim());
     setAliasSpeciesQuery("");
     setAliasTarget(null);
     setAliasSuggestOpen(true);
   }
 
-  const showSuggestOptions = !!query.trim() && !loading && !hasExactMatch;
+  const suggestHint =
+    !query.trim()
+      ? "Can't find what you ate? Suggest a contribution:"
+      : hasExactMatch
+        ? "Or suggest a change to the catalog:"
+        : "No exact match — suggest a contribution:";
 
   return (
     <>
       <Card className="border-primary/15">
         <CardHeader>
           <CardTitle className="text-xl">Log a food</CardTitle>
-          <CardDescription>Search the community species list and save your entry.</CardDescription>
+          <CardDescription>
+            Search the community species list. Missing something? Suggest a new species or alias for admin review.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Popover open={open} onOpenChange={setOpen}>
@@ -263,22 +272,18 @@ export function FoodLogPanel() {
                   </CommandGroup>
                 </CommandList>
               </Command>
-              {showSuggestOptions ? (
-                <>
-                  <Separator />
-                  <div className="space-y-2 p-2">
-                    <p className="px-1 text-xs text-muted-foreground">No exact match — suggest a contribution:</p>
-                    <Button variant="secondary" className="w-full gap-2" onClick={openSpeciesSuggest}>
-                      <Lightbulb className="h-4 w-4" />
-                      Suggest a new species
-                    </Button>
-                    <Button variant="outline" className="w-full gap-2" onClick={openAliasSuggest}>
-                      <Link2 className="h-4 w-4" />
-                      Suggest an alias for an existing species
-                    </Button>
-                  </div>
-                </>
-              ) : null}
+              <Separator />
+              <div className="space-y-2 p-2">
+                <p className="px-1 text-xs text-muted-foreground">{suggestHint}</p>
+                <Button type="button" variant="secondary" className="w-full gap-2" onClick={openSpeciesSuggest}>
+                  <Lightbulb className="h-4 w-4" />
+                  Suggest a new species
+                </Button>
+                <Button type="button" variant="outline" className="w-full gap-2" onClick={openAliasSuggest}>
+                  <Link2 className="h-4 w-4" />
+                  Suggest an alias for an existing species
+                </Button>
+              </div>
             </PopoverContent>
           </Popover>
 
@@ -293,7 +298,23 @@ export function FoodLogPanel() {
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm log"}
               </Button>
             </div>
-          ) : null}
+          ) : (
+            <div className="grid gap-2 rounded-lg border border-dashed bg-muted/20 p-3">
+              <p className="text-sm text-muted-foreground">
+                Can&apos;t find what you ate? Suggestions are reviewed by an admin before they appear in search.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button type="button" variant="secondary" className="gap-2" onClick={openSpeciesSuggest}>
+                  <Lightbulb className="h-4 w-4 shrink-0" />
+                  Suggest a new species
+                </Button>
+                <Button type="button" variant="outline" className="gap-2" onClick={openAliasSuggest}>
+                  <Link2 className="h-4 w-4 shrink-0" />
+                  Suggest an alias
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
