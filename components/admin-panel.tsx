@@ -22,6 +22,7 @@ import { CategoryBadge, SpeciesNames } from "@/components/species-names";
 import { AdminSuggestionQueues } from "@/components/admin-suggestion-queues";
 import { AdminSuggestionHistory } from "@/components/admin-suggestion-history";
 import { AdminManageAdmins } from "@/components/admin-manage-admins";
+import { AdminCatalogDedupe } from "@/components/admin-catalog-dedupe";
 import type { AdminProfileRow } from "@/app/actions/admin";
 import type { AliasSuggestionRow, SpeciesSuggestionRow } from "@/app/actions/suggestions";
 import { formatDateTime } from "@/lib/time";
@@ -104,6 +105,7 @@ export function AdminPanel({
         </TabsTrigger>
         <TabsTrigger value="history">History</TabsTrigger>
         <TabsTrigger value="manage-admins">Manage admins</TabsTrigger>
+        <TabsTrigger value="catalog-cleanup">Catalog cleanup</TabsTrigger>
         <TabsTrigger value="logs">All logs</TabsTrigger>
         <TabsTrigger value="species">Species catalog</TabsTrigger>
         <TabsTrigger value="merge">Merge duplicates</TabsTrigger>
@@ -137,6 +139,10 @@ export function AdminPanel({
 
       <TabsContent value="manage-admins">
         <AdminManageAdmins initialAdmins={admins} />
+      </TabsContent>
+
+      <TabsContent value="catalog-cleanup">
+        <AdminCatalogDedupe />
       </TabsContent>
 
       <TabsContent value="logs">
