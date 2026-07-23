@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Lightbulb, Link2, Loader2 } from "lucide-react";
-import { searchSpeciesAction, type SpeciesSearchRow } from "@/app/actions/species";
+import {
+  checkLatinNameAvailableAction,
+  searchSpeciesAction,
+  type SpeciesSearchRow,
+} from "@/app/actions/species";
 import {
   submitAliasSuggestionAction,
   submitSpeciesSuggestionAction,
@@ -66,6 +70,8 @@ export function FoodLogPanel() {
   const [newCategory, setNewCategory] = useState<(typeof categoryOptions)[number]["value"]>("plant");
   const [suggestionNotes, setSuggestionNotes] = useState("");
   const [submittingSpecies, setSubmittingSpecies] = useState(false);
+  const [latinNameConflict, setLatinNameConflict] = useState<string | null>(null);
+  const [checkingLatin, setCheckingLatin] = useState(false);
 
   const [aliasSuggestOpen, setAliasSuggestOpen] = useState(false);
   const [aliasSpeciesQuery, setAliasSpeciesQuery] = useState("");
@@ -112,6 +118,29 @@ export function FoodLogPanel() {
     }, 220);
     return () => clearTimeout(t);
   }, [aliasSpeciesQuery, aliasSuggestOpen]);
+
+  useEffect(() => {
+    if (!speciesSuggestOpen) {
+      setLatinNameConflict(null);
+      return;
+    }
+    const latin = newLatin.trim();
+    if (!latin) {
+      setLatinNameConflict(null);
+      return;
+    }
+    setCheckingLatin(true);
+    const t = setTimeout(async () => {
+      const res = await checkLatinNameAvailableAction(latin);
+      setCheckingLatin(false);
+      if (res.ok && !res.available) {
+        setLatinNameConflict(`Already listed as “${res.existingCommonName}” (${res.existingLatinName}).`);
+      } else {
+        setLatinNameConflict(null);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [newLatin, speciesSuggestOpen]);
 
   async function onLog() {
     if (!selected) return;
@@ -209,7 +238,12 @@ export function FoodLogPanel() {
     setAliasSuggestOpen(true);
   }
 
-  const showSuggestOptions = !!query.trim() && !loading && !searchError && results.length === 0 && !hasExactMatch;
+  const showSuggestOptions = !!query.trim() && !loading && !searchError;
+  const suggestHint = hasExactMatch
+    ? "Or suggest a change to the catalog:"
+    : results.length > 0
+      ? "No exact match — or suggest a contribution:"
+      : "No matches — suggest a contribution:";
 
   return (
     <>
@@ -269,7 +303,7 @@ export function FoodLogPanel() {
                 <>
                   <Separator />
                   <div className="space-y-2 p-2">
-                    <p className="px-1 text-xs text-muted-foreground">No matches — suggest a contribution:</p>
+                    <p className="px-1 text-xs text-muted-foreground">{suggestHint}</p>
                     <Button type="button" variant="secondary" className="w-full gap-2" onClick={openSpeciesSuggest}>
                       <Lightbulb className="h-4 w-4" />
                       Suggest a new species
@@ -320,7 +354,13 @@ export function FoodLogPanel() {
                 onChange={(e) => setNewLatin(e.target.value)}
                 placeholder="e.g. Bos taurus"
                 required
+                aria-invalid={!!latinNameConflict}
               />
+              {checkingLatin ? (
+                <p className="text-xs text-muted-foreground">Checking scientific name…</p>
+              ) : latinNameConflict ? (
+                <p className="text-xs text-destructive">{latinNameConflict}</p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="s-alt">Alternative names (optional)</Label>
@@ -330,6 +370,7 @@ export function FoodLogPanel() {
                 onChange={(e) => setNewAltNames(e.target.value)}
                 placeholder="beef, burger, steak"
               />
+              <p className="text-xs text-muted-foreground">Comma-separated — each name becomes a searchable alias.</p>
             </div>
             <div className="grid gap-2">
               <Label>Category</Label>
@@ -360,7 +401,13 @@ export function FoodLogPanel() {
           <DialogFooter>
             <Button
               onClick={onSubmitSpeciesSuggestion}
-              disabled={submittingSpecies || !newCommon.trim() || !newLatin.trim()}
+              disabled={
+                submittingSpecies ||
+                checkingLatin ||
+                !!latinNameConflict ||
+                !newCommon.trim() ||
+                !newLatin.trim()
+              }
             >
               {submittingSpecies ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit suggestion"}
             </Button>

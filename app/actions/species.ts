@@ -54,6 +54,33 @@ async function findSpeciesByLatinName(
   return data as { id: string; common_name: string; latin_name: string } | null;
 }
 
+export async function checkLatinNameAvailableAction(
+  latinName: string
+): Promise<
+  | { ok: true; available: true }
+  | { ok: true; available: false; existingCommonName: string; existingLatinName: string }
+  | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You must be signed in." };
+
+  const trimmed = latinName.trim();
+  if (!trimmed) return { ok: true, available: true };
+
+  const existing = await findSpeciesByLatinName(supabase, trimmed);
+  if (!existing) return { ok: true, available: true };
+
+  return {
+    ok: true,
+    available: false,
+    existingCommonName: existing.common_name,
+    existingLatinName: existing.latin_name,
+  };
+}
+
 function nameAlreadyListed(
   name: string,
   species: { common_name: string; latin_name: string | null; alternative_names?: string[] | null }

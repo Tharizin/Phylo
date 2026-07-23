@@ -82,6 +82,20 @@ export async function submitSpeciesSuggestionAction(input: {
   if (!commonName) return { ok: false, error: "Common name is required." };
   if (!latinName) return { ok: false, error: "Latin name is required." };
 
+  const { data: existingSpecies } = await supabase
+    .from("species")
+    .select("common_name, latin_name")
+    .ilike("latin_name", latinName)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingSpecies) {
+    return {
+      ok: false,
+      error: `This species is already in the catalog as “${existingSpecies.common_name as string}” (${existingSpecies.latin_name as string}). Log that entry instead.`,
+    };
+  }
+
   const { error } = await supabase.from("species_suggestions").insert({
     submitted_by: user.id,
     common_name: commonName,
