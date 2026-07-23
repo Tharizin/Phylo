@@ -209,21 +209,14 @@ export function FoodLogPanel() {
     setAliasSuggestOpen(true);
   }
 
-  const suggestHint =
-    !query.trim()
-      ? "Can't find what you ate? Suggest a contribution:"
-      : hasExactMatch
-        ? "Or suggest a change to the catalog:"
-        : "No exact match — suggest a contribution:";
+  const showSuggestOptions = !!query.trim() && !loading && !searchError && results.length === 0 && !hasExactMatch;
 
   return (
     <>
       <Card className="border-primary/15">
         <CardHeader>
           <CardTitle className="text-xl">Log a food</CardTitle>
-          <CardDescription>
-            Search the community species list. Missing something? Suggest a new species or alias for admin review.
-          </CardDescription>
+          <CardDescription>Search the community species list and save your entry.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Popover open={open} onOpenChange={setOpen}>
@@ -272,18 +265,22 @@ export function FoodLogPanel() {
                   </CommandGroup>
                 </CommandList>
               </Command>
-              <Separator />
-              <div className="space-y-2 p-2">
-                <p className="px-1 text-xs text-muted-foreground">{suggestHint}</p>
-                <Button type="button" variant="secondary" className="w-full gap-2" onClick={openSpeciesSuggest}>
-                  <Lightbulb className="h-4 w-4" />
-                  Suggest a new species
-                </Button>
-                <Button type="button" variant="outline" className="w-full gap-2" onClick={openAliasSuggest}>
-                  <Link2 className="h-4 w-4" />
-                  Suggest an alias for an existing species
-                </Button>
-              </div>
+              {showSuggestOptions ? (
+                <>
+                  <Separator />
+                  <div className="space-y-2 p-2">
+                    <p className="px-1 text-xs text-muted-foreground">No matches — suggest a contribution:</p>
+                    <Button type="button" variant="secondary" className="w-full gap-2" onClick={openSpeciesSuggest}>
+                      <Lightbulb className="h-4 w-4" />
+                      Suggest a new species
+                    </Button>
+                    <Button type="button" variant="outline" className="w-full gap-2" onClick={openAliasSuggest}>
+                      <Link2 className="h-4 w-4" />
+                      Suggest an alias for an existing species
+                    </Button>
+                  </div>
+                </>
+              ) : null}
             </PopoverContent>
           </Popover>
 
@@ -298,23 +295,7 @@ export function FoodLogPanel() {
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm log"}
               </Button>
             </div>
-          ) : (
-            <div className="grid gap-2 rounded-lg border border-dashed bg-muted/20 p-3">
-              <p className="text-sm text-muted-foreground">
-                Can&apos;t find what you ate? Suggestions are reviewed by an admin before they appear in search.
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button type="button" variant="secondary" className="gap-2" onClick={openSpeciesSuggest}>
-                  <Lightbulb className="h-4 w-4 shrink-0" />
-                  Suggest a new species
-                </Button>
-                <Button type="button" variant="outline" className="gap-2" onClick={openAliasSuggest}>
-                  <Link2 className="h-4 w-4 shrink-0" />
-                  Suggest an alias
-                </Button>
-              </div>
-            </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
@@ -398,31 +379,48 @@ export function FoodLogPanel() {
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
               <Label>Find species</Label>
-              <Input
-                value={aliasSpeciesQuery}
-                onChange={(e) => setAliasSpeciesQuery(e.target.value)}
-                placeholder="Search existing species…"
-              />
-              <div className="max-h-40 overflow-y-auto rounded-md border">
-                {aliasSpeciesLoading ? (
-                  <p className="p-3 text-sm text-muted-foreground">Searching…</p>
-                ) : aliasSpeciesResults.length === 0 ? (
-                  <p className="p-3 text-sm text-muted-foreground">Type to search species.</p>
-                ) : (
-                  aliasSpeciesResults.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      className={`w-full border-b px-3 py-2 text-left text-sm last:border-0 hover:bg-muted ${
-                        aliasTarget?.id === s.id ? "bg-muted" : ""
-                      }`}
-                      onClick={() => setAliasTarget(s)}
-                    >
-                      <SpeciesNames commonName={s.common_name} latinName={s.latin_name} />
-                    </button>
-                  ))
-                )}
-              </div>
+              {aliasTarget ? (
+                <div className="rounded-md border bg-muted/30 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">Selected</p>
+                  <SpeciesNames commonName={aliasTarget.common_name} latinName={aliasTarget.latin_name} />
+                </div>
+              ) : null}
+              <Command shouldFilter={false} className="rounded-md border">
+                <CommandInput
+                  placeholder="Search existing species…"
+                  value={aliasSpeciesQuery}
+                  onValueChange={setAliasSpeciesQuery}
+                />
+                <CommandList>
+                  <CommandEmpty className="py-4 text-center text-sm text-muted-foreground">
+                    {aliasSpeciesLoading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Searching…
+                      </span>
+                    ) : (
+                      "Type to search species."
+                    )}
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {!aliasSpeciesLoading &&
+                      aliasSpeciesResults.map((s) => (
+                        <CommandItem
+                          key={s.id}
+                          value={s.id}
+                          onSelect={() => setAliasTarget(s)}
+                          onMouseDown={(e) => e.preventDefault()}
+                          className={`flex cursor-pointer flex-col items-start gap-0.5 py-3 ${
+                            aliasTarget?.id === s.id ? "bg-accent" : ""
+                          }`}
+                        >
+                          <SpeciesNames commonName={s.common_name} latinName={s.latin_name} />
+                          <p className="text-xs capitalize text-muted-foreground">{s.category}</p>
+                        </CommandItem>
+                      ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="alias-input">Suggested alias</Label>
