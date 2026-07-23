@@ -40,3 +40,11 @@ export function rankSpeciesSearchResults<T extends SpeciesSearchMatch & { id: st
       return a.common_name.localeCompare(b.common_name);
     });
 }
+
+export function isExactSpeciesNameMatch(term: string, row: SpeciesSearchMatch): boolean {
+  const q = term.trim().toLowerCase();
+  if (!q) return false;
+  if (row.common_name.trim().toLowerCase() === q) return true;
+  if (row.latin_name?.trim().toLowerCase() === q) return true;
+  return (row.alternative_names ?? []).some((name) => name.trim().toLowerCase() === q);
+}

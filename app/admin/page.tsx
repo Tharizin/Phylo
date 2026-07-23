@@ -40,9 +40,6 @@ export default async function AdminPage() {
     );
   }
 
-  const userIds = Array.from(new Set((logs ?? []).map((l) => l.user_id as string)));
-  const { data: profiles } = await supabase.from("profiles").select("id, username").in("id", userIds);
-
   const { data: species, error: spErr } = await supabase.from("species").select("*").order("common_name", { ascending: true });
 
   if (spErr) {
@@ -53,13 +50,36 @@ export default async function AdminPage() {
     );
   }
 
-  const profileMap: Record<string, string> = Object.fromEntries((profiles ?? []).map((p) => [p.id as string, p.username as string]));
+  const { data: speciesSuggestions } = await supabase
+    .from("species_suggestions")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  const { data: aliasSuggestionsRaw } = await supabase
+    .from("alias_suggestions")
+    .select("*, species ( common_name, latin_name )")
+    .order("created_at", { ascending: false });
+
+  const logUserIds = (logs ?? []).map((l) => l.user_id as string);
+  const suggestionUserIds = (speciesSuggestions ?? []).map((s) => s.submitted_by as string);
+  const aliasUserIds = (aliasSuggestionsRaw ?? []).map((s) => s.submitted_by as string);
+  const userIds = Array.from(new Set([...logUserIds, ...suggestionUserIds, ...aliasUserIds]));
+
+  const { data: profiles } = userIds.length
+    ? await supabase.from("profiles").select("id, username").in("id", userIds)
+    : { data: [] as { id: string; username: string }[] };
+
+  const profileMap: Record<string, string> = Object.fromEntries(
+    (profiles ?? []).map((p) => [p.id as string, p.username as string])
+  );
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-10">
       <div>
         <h1 className="text-3xl font-semibold">Admin</h1>
-        <p className="mt-2 text-muted-foreground">Merge duplicate species, edit catalog entries, and moderate food logs.</p>
+        <p className="mt-2 text-muted-foreground">
+          Review species contributions, merge duplicates, edit catalog entries, and moderate food logs.
+        </p>
       </div>
       <AdminPanel
         logs={(logs ?? []).map((row) => ({
@@ -77,6 +97,30 @@ export default async function AdminPage() {
           common_name: s.common_name as string,
           latin_name: (s.latin_name as string | null) ?? null,
           category: s.category as string,
+        }))}
+        speciesSuggestions={(speciesSuggestions ?? []).map((s) => ({
+          id: s.id as string,
+          submitted_by: s.submitted_by as string,
+          common_name: s.common_name as string,
+          latin_name: (s.latin_name as string | null) ?? null,
+          category: s.category as string,
+          alternative_names: (s.alternative_names as string[] | null) ?? [],
+          notes: (s.notes as string | null) ?? null,
+          status: s.status as string,
+          reviewer_notes: (s.reviewer_notes as string | null) ?? null,
+          created_at: s.created_at as string,
+          reviewed_at: (s.reviewed_at as string | null) ?? null,
+        }))}
+        aliasSuggestions={(aliasSuggestionsRaw ?? []).map((s) => ({
+          id: s.id as string,
+          submitted_by: s.submitted_by as string,
+          species_id: s.species_id as string,
+          suggested_alias: s.suggested_alias as string,
+          status: s.status as string,
+          reviewer_notes: (s.reviewer_notes as string | null) ?? null,
+          created_at: s.created_at as string,
+          reviewed_at: (s.reviewed_at as string | null) ?? null,
+          species: normalizeSpeciesJoin(s.species) as { common_name: string; latin_name: string | null },
         }))}
       />
     </div>

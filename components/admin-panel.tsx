@@ -19,6 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryBadge, SpeciesNames } from "@/components/species-names";
+import { AdminSuggestionQueues } from "@/components/admin-suggestion-queues";
+import type { AliasSuggestionRow, SpeciesSuggestionRow } from "@/app/actions/suggestions";
 import { formatDateTime } from "@/lib/time";
 
 type AdminLog = {
@@ -42,10 +44,14 @@ export function AdminPanel({
   logs,
   profileMap,
   species,
+  speciesSuggestions,
+  aliasSuggestions,
 }: {
   logs: AdminLog[];
   profileMap: Record<string, string>;
   species: Species[];
+  speciesSuggestions: SpeciesSuggestionRow[];
+  aliasSuggestions: AliasSuggestionRow[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -80,12 +86,32 @@ export function AdminPanel({
 
   return (
     <>
-    <Tabs defaultValue="logs">
-      <TabsList>
+    <Tabs defaultValue="species-queue">
+      <TabsList className="flex h-auto flex-wrap">
+        <TabsTrigger value="species-queue">Species queue</TabsTrigger>
+        <TabsTrigger value="alias-queue">Alias queue</TabsTrigger>
         <TabsTrigger value="logs">All logs</TabsTrigger>
         <TabsTrigger value="species">Species</TabsTrigger>
         <TabsTrigger value="merge">Merge duplicates</TabsTrigger>
       </TabsList>
+
+      <TabsContent value="species-queue">
+        <AdminSuggestionQueues
+          speciesSuggestions={speciesSuggestions}
+          aliasSuggestions={aliasSuggestions}
+          profileMap={profileMap}
+          mode="species"
+        />
+      </TabsContent>
+
+      <TabsContent value="alias-queue">
+        <AdminSuggestionQueues
+          speciesSuggestions={speciesSuggestions}
+          aliasSuggestions={aliasSuggestions}
+          profileMap={profileMap}
+          mode="alias"
+        />
+      </TabsContent>
 
       <TabsContent value="logs">
         <Card>

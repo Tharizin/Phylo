@@ -42,7 +42,7 @@ export const fullHelpSlides: HelpSlide[] = [
     body: [
       "On the Dashboard, open the species search, type a common or latin name, and select a match.",
       "Confirm the log (notes are optional). Your entry appears in History and counts toward this week's species total.",
-      "Can't find it? Click Add new species — but check the latin name first so you don't create a duplicate.",
+      "Can't find it? Use “Suggest a new species” or “Suggest an alias” — an admin will review your contribution.",
     ],
   },
   {
@@ -59,8 +59,9 @@ export const fullHelpSlides: HelpSlide[] = [
     title: "Adding a new species",
     body: [
       "Every species needs a latin (scientific) name — e.g. Bos taurus for cow. This prevents duplicates like two separate \"cow\" entries.",
-      "If the species already exists under that latin name, you'll be prompted to log the existing entry instead.",
-      "Add alternative names (beef, burger) so others can find the species by everyday words. You can also add aliases later when logging an existing species.",
+      "If you can't find a species, use “Suggest a new species” in the search dropdown. Your suggestion goes to an admin queue — it won't appear in the catalog until approved.",
+      "You can also suggest aliases for existing species (e.g. “rocket” for arugula). Admins review those too.",
+      "Check the latin name before suggesting — if the species already exists, log that entry or suggest an alias instead.",
     ],
   },
   {

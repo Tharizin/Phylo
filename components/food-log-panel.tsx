@@ -1,13 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Tag } from "lucide-react";
+import { Lightbulb, Link2, Loader2 } from "lucide-react";
+import { searchSpeciesAction, type SpeciesSearchRow } from "@/app/actions/species";
 import {
-  addAlternativeNameAction,
-  createSpeciesAction,
-  searchSpeciesAction,
-  type SpeciesSearchRow,
-} from "@/app/actions/species";
+  submitAliasSuggestionAction,
+  submitSpeciesSuggestionAction,
+} from "@/app/actions/suggestions";
 import { logFoodAction } from "@/app/actions/food";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +17,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +47,7 @@ export function FoodLogPanel() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SpeciesSearchRow[]>([]);
+  const [hasExactMatch, setHasExactMatch] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [selected, setSelected] = useState<SpeciesSearchRow | null>(null);
   const [notes, setNotes] = useState("");
@@ -60,15 +59,21 @@ export function FoodLogPanel() {
     points: number;
   } | null>(null);
 
-  const [addOpen, setAddOpen] = useState(false);
+  const [speciesSuggestOpen, setSpeciesSuggestOpen] = useState(false);
   const [newCommon, setNewCommon] = useState("");
   const [newLatin, setNewLatin] = useState("");
   const [newAltNames, setNewAltNames] = useState("");
   const [newCategory, setNewCategory] = useState<(typeof categoryOptions)[number]["value"]>("plant");
-  const [creating, setCreating] = useState(false);
+  const [suggestionNotes, setSuggestionNotes] = useState("");
+  const [submittingSpecies, setSubmittingSpecies] = useState(false);
 
-  const [altNameInput, setAltNameInput] = useState("");
-  const [addingAlt, setAddingAlt] = useState(false);
+  const [aliasSuggestOpen, setAliasSuggestOpen] = useState(false);
+  const [aliasSpeciesQuery, setAliasSpeciesQuery] = useState("");
+  const [aliasSpeciesResults, setAliasSpeciesResults] = useState<SpeciesSearchRow[]>([]);
+  const [aliasSpeciesLoading, setAliasSpeciesLoading] = useState(false);
+  const [aliasTarget, setAliasTarget] = useState<SpeciesSearchRow | null>(null);
+  const [aliasInput, setAliasInput] = useState("");
+  const [submittingAlias, setSubmittingAlias] = useState(false);
 
   const runSearch = useCallback(async (q: string) => {
     setLoading(true);
@@ -78,10 +83,12 @@ export function FoodLogPanel() {
       console.error("species search failed:", res.error);
       setSearchError(res.error);
       setResults([]);
+      setHasExactMatch(false);
       return;
     }
     setSearchError(null);
     setResults(res.results);
+    setHasExactMatch(res.hasExactMatch);
   }, []);
 
   useEffect(() => {
@@ -95,11 +102,16 @@ export function FoodLogPanel() {
   }, [query, runSearch]);
 
   useEffect(() => {
-    if (selected && query.trim()) {
-      setAltNameInput(query.trim());
-    }
-  }, [selected, query]);
-
+    if (!aliasSuggestOpen) return;
+    const t = setTimeout(async () => {
+      setAliasSpeciesLoading(true);
+      const res = await searchSpeciesAction(aliasSpeciesQuery, 20);
+      setAliasSpeciesLoading(false);
+      if (res.ok) setAliasSpeciesResults(res.results);
+      else setAliasSpeciesResults([]);
+    }, 220);
+    return () => clearTimeout(t);
+  }, [aliasSpeciesQuery, aliasSuggestOpen]);
 
   async function onLog() {
     if (!selected) return;
@@ -128,67 +140,74 @@ export function FoodLogPanel() {
     setSelected(null);
     setNotes("");
     setQuery("");
-    setAltNameInput("");
   }
 
-  async function onCreateSpecies() {
+  async function onSubmitSpeciesSuggestion() {
     if (!newLatin.trim()) {
-      toast({ title: "Latin name required", description: "Enter the scientific name to identify this species.", variant: "destructive" });
+      toast({ title: "Latin name required", description: "Enter the scientific name.", variant: "destructive" });
       return;
     }
-    setCreating(true);
-    const res = await createSpeciesAction({
+    setSubmittingSpecies(true);
+    const res = await submitSpeciesSuggestionAction({
       commonName: newCommon,
       latinName: newLatin,
       category: newCategory,
       alternativeNames: newAltNames,
+      notes: suggestionNotes,
     });
-    setCreating(false);
+    setSubmittingSpecies(false);
     if (!res.ok) {
-      toast({ title: "Could not add species", description: res.error, variant: "destructive" });
+      toast({ title: "Could not submit", description: res.error, variant: "destructive" });
       return;
     }
-    toast({ title: "Species added", description: "It is now available to everyone." });
-    setAddOpen(false);
-    const common = newCommon.trim();
-    const latin = newLatin.trim();
+    toast({ title: "Thanks! Your suggestion has been sent for review." });
+    setSpeciesSuggestOpen(false);
     setNewCommon("");
     setNewLatin("");
     setNewAltNames("");
+    setSuggestionNotes("");
     setNewCategory("plant");
-    setSelected({
-      id: res.id,
-      common_name: common,
-      latin_name: latin,
-      category: newCategory,
-    });
-    await runSearch(query);
   }
 
-  async function onAddAlternativeName(name?: string) {
-    if (!selected) return;
-    const toAdd = (name ?? altNameInput).trim();
-    if (!toAdd) return;
-    setAddingAlt(true);
-    const res = await addAlternativeNameAction(selected.id, toAdd);
-    setAddingAlt(false);
-    if (!res.ok) {
-      toast({ title: "Could not add alias", description: res.error, variant: "destructive" });
+  async function onSubmitAliasSuggestion() {
+    if (!aliasTarget) {
+      toast({ title: "Select a species", description: "Pick the species this alias belongs to.", variant: "destructive" });
       return;
     }
-    toast({
-      title: "Alternative name added",
-      description: `“${toAdd}” will now match ${selected.common_name} in search.`,
+    if (!aliasInput.trim()) {
+      toast({ title: "Alias required", description: "Enter the alias you want to suggest.", variant: "destructive" });
+      return;
+    }
+    setSubmittingAlias(true);
+    const res = await submitAliasSuggestionAction({
+      speciesId: aliasTarget.id,
+      suggestedAlias: aliasInput,
     });
-    setAltNameInput("");
-    await runSearch(query);
+    setSubmittingAlias(false);
+    if (!res.ok) {
+      toast({ title: "Could not submit", description: res.error, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Thanks! We'll review your suggested alias." });
+    setAliasSuggestOpen(false);
+    setAliasTarget(null);
+    setAliasInput("");
+    setAliasSpeciesQuery("");
   }
 
-  const canQuickAddQuery =
-    selected &&
-    query.trim() &&
-    query.trim().toLowerCase() !== selected.common_name.toLowerCase() &&
-    query.trim().toLowerCase() !== (selected.latin_name ?? "").toLowerCase();
+  function openSpeciesSuggest() {
+    if (query.trim()) setNewCommon(query.trim());
+    setSpeciesSuggestOpen(true);
+  }
+
+  function openAliasSuggest() {
+    setAliasInput(query.trim());
+    setAliasSpeciesQuery("");
+    setAliasTarget(null);
+    setAliasSuggestOpen(true);
+  }
+
+  const showSuggestOptions = !!query.trim() && !loading && !hasExactMatch;
 
   return (
     <>
@@ -221,7 +240,7 @@ export function FoodLogPanel() {
                     ) : searchError ? (
                       <span className="text-destructive">Search unavailable: {searchError}</span>
                     ) : (
-                      "No matches. Add a new species below."
+                      "No matches found."
                     )}
                   </CommandEmpty>
                   <CommandGroup heading="Species">
@@ -244,143 +263,28 @@ export function FoodLogPanel() {
                   </CommandGroup>
                 </CommandList>
               </Command>
-              <Separator />
-              <div className="p-2">
-                <Dialog
-                  open={addOpen}
-                  onOpenChange={(o) => {
-                    setAddOpen(o);
-                    if (o && query.trim()) setNewCommon(query.trim());
-                    if (!o) {
-                      setNewCommon("");
-                      setNewLatin("");
-                      setNewAltNames("");
-                    }
-                  }}
-                >
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="secondary"
-                      className="w-full gap-2"
-                      onClick={() => {
-                        if (query.trim()) setNewCommon(query.trim());
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add new species
+              {showSuggestOptions ? (
+                <>
+                  <Separator />
+                  <div className="space-y-2 p-2">
+                    <p className="px-1 text-xs text-muted-foreground">No exact match — suggest a contribution:</p>
+                    <Button variant="secondary" className="w-full gap-2" onClick={openSpeciesSuggest}>
+                      <Lightbulb className="h-4 w-4" />
+                      Suggest a new species
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add a species</DialogTitle>
-                      <DialogDescription>
-                        The latin name uniquely identifies each species. Duplicates are not allowed.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-3 py-2">
-                      <div className="grid gap-2">
-                        <Label htmlFor="cn">Common name</Label>
-                        <Input id="cn" value={newCommon} onChange={(e) => setNewCommon(e.target.value)} required />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="lat">Latin name</Label>
-                        <Input
-                          id="lat"
-                          value={newLatin}
-                          onChange={(e) => setNewLatin(e.target.value)}
-                          placeholder="e.g. Bos taurus"
-                          required
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="alt">Alternative names (optional)</Label>
-                        <Input
-                          id="alt"
-                          value={newAltNames}
-                          onChange={(e) => setNewAltNames(e.target.value)}
-                          placeholder="beef, burger, steak"
-                        />
-                        <p className="text-xs text-muted-foreground">Comma-separated. Used for search matching.</p>
-                      </div>
-                      <div className="grid gap-2">
-                        <Label>Category</Label>
-                        <Select value={newCategory} onValueChange={(v) => setNewCategory(v as typeof newCategory)}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categoryOptions.map((c) => (
-                              <SelectItem key={c.value} value={c.value}>
-                                {c.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        onClick={onCreateSpecies}
-                        disabled={creating || !newCommon.trim() || !newLatin.trim()}
-                      >
-                        {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save species"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
+                    <Button variant="outline" className="w-full gap-2" onClick={openAliasSuggest}>
+                      <Link2 className="h-4 w-4" />
+                      Suggest an alias for an existing species
+                    </Button>
+                  </div>
+                </>
+              ) : null}
             </PopoverContent>
           </Popover>
 
           {selected ? (
             <div className="grid gap-4 rounded-lg border bg-muted/30 p-4">
               <SpeciesNames commonName={selected.common_name} latinName={selected.latin_name} />
-
-              <div className="grid gap-2 rounded-md border border-dashed bg-background/60 p-3">
-                <Label className="flex items-center gap-1.5 text-sm">
-                  <Tag className="h-3.5 w-3.5" />
-                  Add search alias
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Help others find this species by another name (e.g. add &quot;steak&quot; to Cow).
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    value={altNameInput}
-                    onChange={(e) => setAltNameInput(e.target.value)}
-                    placeholder="steak, burger, …"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void onAddAlternativeName();
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="shrink-0"
-                    disabled={addingAlt || !altNameInput.trim()}
-                    onClick={() => void onAddAlternativeName()}
-                  >
-                    {addingAlt ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add"}
-                  </Button>
-                </div>
-                {canQuickAddQuery ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto justify-start px-0 text-xs text-primary"
-                    disabled={addingAlt}
-                    onClick={() => void onAddAlternativeName(query.trim())}
-                  >
-                    Add &quot;{query.trim()}&quot; from your search
-                  </Button>
-                ) : null}
-              </div>
-
               <div className="grid gap-2">
                 <Label htmlFor="nt">Notes (optional)</Label>
                 <Input id="nt" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Meal, source, etc." />
@@ -392,6 +296,133 @@ export function FoodLogPanel() {
           ) : null}
         </CardContent>
       </Card>
+
+      <Dialog open={speciesSuggestOpen} onOpenChange={setSpeciesSuggestOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Suggest a new species</DialogTitle>
+            <DialogDescription>
+              Your suggestion goes to an admin for review before it appears in the catalog.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid gap-2">
+              <Label htmlFor="s-cn">Common name</Label>
+              <Input id="s-cn" value={newCommon} onChange={(e) => setNewCommon(e.target.value)} required />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="s-lat">Latin name</Label>
+              <Input
+                id="s-lat"
+                value={newLatin}
+                onChange={(e) => setNewLatin(e.target.value)}
+                placeholder="e.g. Bos taurus"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="s-alt">Alternative names (optional)</Label>
+              <Input
+                id="s-alt"
+                value={newAltNames}
+                onChange={(e) => setNewAltNames(e.target.value)}
+                placeholder="beef, burger, steak"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Category</Label>
+              <Select value={newCategory} onValueChange={(v) => setNewCategory(v as typeof newCategory)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoryOptions.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="s-notes">Notes (optional)</Label>
+              <textarea
+                id="s-notes"
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={suggestionNotes}
+                onChange={(e) => setSuggestionNotes(e.target.value)}
+                placeholder="Why should this species be added? Source or context…"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={onSubmitSpeciesSuggestion}
+              disabled={submittingSpecies || !newCommon.trim() || !newLatin.trim()}
+            >
+              {submittingSpecies ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit suggestion"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={aliasSuggestOpen} onOpenChange={setAliasSuggestOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Suggest an alias</DialogTitle>
+            <DialogDescription>
+              Help others find a species by another name (e.g. &quot;rocket&quot; for arugula).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Find species</Label>
+              <Input
+                value={aliasSpeciesQuery}
+                onChange={(e) => setAliasSpeciesQuery(e.target.value)}
+                placeholder="Search existing species…"
+              />
+              <div className="max-h-40 overflow-y-auto rounded-md border">
+                {aliasSpeciesLoading ? (
+                  <p className="p-3 text-sm text-muted-foreground">Searching…</p>
+                ) : aliasSpeciesResults.length === 0 ? (
+                  <p className="p-3 text-sm text-muted-foreground">Type to search species.</p>
+                ) : (
+                  aliasSpeciesResults.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className={`w-full border-b px-3 py-2 text-left text-sm last:border-0 hover:bg-muted ${
+                        aliasTarget?.id === s.id ? "bg-muted" : ""
+                      }`}
+                      onClick={() => setAliasTarget(s)}
+                    >
+                      <SpeciesNames commonName={s.common_name} latinName={s.latin_name} />
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="alias-input">Suggested alias</Label>
+              <Input
+                id="alias-input"
+                value={aliasInput}
+                onChange={(e) => setAliasInput(e.target.value)}
+                placeholder="e.g. rocket"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={onSubmitAliasSuggestion}
+              disabled={submittingAlias || !aliasTarget || !aliasInput.trim()}
+            >
+              {submittingAlias ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit suggestion"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <NewSpeciesCelebration
         open={!!celebration}

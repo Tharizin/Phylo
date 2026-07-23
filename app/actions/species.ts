@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError } from "@/lib/supabase/errors";
-import { rankSpeciesSearchResults } from "@/lib/species-search";
+import { rankSpeciesSearchResults, isExactSpeciesNameMatch } from "@/lib/species-search";
 
 export type SpeciesSearchRow = {
   id: string;
@@ -67,7 +67,9 @@ function nameAlreadyListed(
 export async function searchSpeciesAction(
   query: string,
   limit = 24
-): Promise<{ ok: true; results: SpeciesSearchRow[] } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; results: SpeciesSearchRow[]; hasExactMatch: boolean } | { ok: false; error: string }
+> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -83,9 +85,11 @@ export async function searchSpeciesAction(
   });
 
   if (!error) {
+    const rows = (data ?? []) as SpeciesSearchDbRow[];
     return {
       ok: true,
-      results: toSearchRows((data ?? []) as SpeciesSearchDbRow[], term).slice(0, capped),
+      results: toSearchRows(rows, term).slice(0, capped),
+      hasExactMatch: term ? rows.some((row) => isExactSpeciesNameMatch(term, row)) : false,
     };
   }
 
@@ -117,7 +121,12 @@ export async function searchSpeciesAction(
     merged.set(row.id, row);
   }
 
-  return { ok: true, results: toSearchRows(Array.from(merged.values()), term).slice(0, capped) };
+  const mergedRows = Array.from(merged.values());
+  return {
+    ok: true,
+    results: toSearchRows(mergedRows, term).slice(0, capped),
+    hasExactMatch: term ? mergedRows.some((row) => isExactSpeciesNameMatch(term, row)) : false,
+  };
 }
 
 export async function addAlternativeNameAction(
@@ -129,6 +138,11 @@ export async function addAlternativeNameAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorized" };
+
+  const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+  if (!prof?.is_admin) {
+    return { ok: false, error: "Only admins can add aliases directly. Submit a suggestion instead." };
+  }
 
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: "Enter a name to add." };
@@ -174,6 +188,11 @@ export async function createSpeciesAction(input: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorized" };
+
+  const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+  if (!prof?.is_admin) {
+    return { ok: false, error: "Only admins can add species directly. Submit a suggestion instead." };
+  }
 
   const name = input.commonName.trim();
   if (!name) return { ok: false, error: "Common name is required." };
