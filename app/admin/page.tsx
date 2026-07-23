@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeSpeciesJoin } from "@/lib/supabase/relations";
+import { resolveIsAdmin } from "@/lib/admin";
 import { AdminPanel } from "@/components/admin-panel";
 
 export default async function AdminPage() {
@@ -10,15 +11,15 @@ export default async function AdminPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!prof?.is_admin) {
+  const { data: prof } = await supabase.from("profiles").select("username, is_admin").eq("id", user.id).single();
+  if (!prof || !resolveIsAdmin(prof as { username: string; is_admin: boolean })) {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
         <h1 className="text-2xl font-semibold">Admin access required</h1>
         <p className="mt-3 text-muted-foreground">
           Ask a database maintainer to run{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-sm">
-            {`update public.profiles set is_admin = true where id = 'YOUR_USER_UUID';`}
+            {`update public.profiles set is_admin = true where lower(username) = 'tharizin';`}
           </code>{" "}
           in the Supabase SQL editor.
         </p>
@@ -60,6 +61,12 @@ export default async function AdminPage() {
     .select("*, species ( common_name, latin_name )")
     .order("created_at", { ascending: false });
 
+  const { data: adminProfiles } = await supabase
+    .from("profiles")
+    .select("id, username, is_admin")
+    .eq("is_admin", true)
+    .order("username", { ascending: true });
+
   const logUserIds = (logs ?? []).map((l) => l.user_id as string);
   const suggestionUserIds = (speciesSuggestions ?? []).map((s) => s.submitted_by as string);
   const aliasUserIds = (aliasSuggestionsRaw ?? []).map((s) => s.submitted_by as string);
@@ -78,7 +85,7 @@ export default async function AdminPage() {
       <div>
         <h1 className="text-3xl font-semibold">Admin</h1>
         <p className="mt-2 text-muted-foreground">
-          Review species contributions, merge duplicates, edit catalog entries, and moderate food logs.
+          Review species contributions, manage admins, merge duplicates, edit catalog entries, and moderate food logs.
         </p>
       </div>
       <AdminPanel
@@ -121,6 +128,11 @@ export default async function AdminPage() {
           created_at: s.created_at as string,
           reviewed_at: (s.reviewed_at as string | null) ?? null,
           species: normalizeSpeciesJoin(s.species) as { common_name: string; latin_name: string | null },
+        }))}
+        admins={(adminProfiles ?? []).map((p) => ({
+          id: p.id as string,
+          username: p.username as string,
+          is_admin: true,
         }))}
       />
     </div>

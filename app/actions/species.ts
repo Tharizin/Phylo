@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError } from "@/lib/supabase/errors";
+import { requireAdminProfile } from "@/lib/supabase/admin-auth";
 import { rankSpeciesSearchResults, isExactSpeciesNameMatch } from "@/lib/species-search";
 
 export type SpeciesSearchRow = {
@@ -166,8 +167,8 @@ export async function addAlternativeNameAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorized" };
 
-  const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!prof?.is_admin) {
+  const prof = await requireAdminProfile(supabase, user.id);
+  if (!prof) {
     return { ok: false, error: "Only admins can add aliases directly. Submit a suggestion instead." };
   }
 
@@ -216,8 +217,8 @@ export async function createSpeciesAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorized" };
 
-  const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!prof?.is_admin) {
+  const prof = await requireAdminProfile(supabase, user.id);
+  if (!prof) {
     return { ok: false, error: "Only admins can add species directly. Submit a suggestion instead." };
   }
 
@@ -292,8 +293,8 @@ export async function adminUpdateSpeciesAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorized" };
 
-  const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!prof?.is_admin) return { ok: false, error: "Forbidden" };
+  const prof = await requireAdminProfile(supabase, user.id);
+  if (!prof) return { ok: false, error: "Forbidden" };
 
   const patch: Record<string, unknown> = {};
   if (input.commonName !== undefined) patch.common_name = input.commonName.trim();
@@ -320,8 +321,8 @@ export async function adminMergeSpeciesAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorized" };
 
-  const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!prof?.is_admin) return { ok: false, error: "Forbidden" };
+  const prof = await requireAdminProfile(supabase, user.id);
+  if (!prof) return { ok: false, error: "Forbidden" };
 
   if (input.keepSpeciesId === input.mergeSpeciesId) return { ok: false, error: "Choose two different species." };
 
@@ -348,8 +349,8 @@ export async function adminDeleteSpeciesAction(id: string): Promise<{ ok: true }
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorized" };
 
-  const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!prof?.is_admin) return { ok: false, error: "Forbidden" };
+  const prof = await requireAdminProfile(supabase, user.id);
+  if (!prof) return { ok: false, error: "Forbidden" };
 
   const { count, error: cErr } = await supabase
     .from("food_logs")

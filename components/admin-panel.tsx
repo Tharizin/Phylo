@@ -20,6 +20,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryBadge, SpeciesNames } from "@/components/species-names";
 import { AdminSuggestionQueues } from "@/components/admin-suggestion-queues";
+import { AdminSuggestionHistory } from "@/components/admin-suggestion-history";
+import { AdminManageAdmins } from "@/components/admin-manage-admins";
+import type { AdminProfileRow } from "@/app/actions/admin";
 import type { AliasSuggestionRow, SpeciesSuggestionRow } from "@/app/actions/suggestions";
 import { formatDateTime } from "@/lib/time";
 
@@ -46,12 +49,14 @@ export function AdminPanel({
   species,
   speciesSuggestions,
   aliasSuggestions,
+  admins,
 }: {
   logs: AdminLog[];
   profileMap: Record<string, string>;
   species: Species[];
   speciesSuggestions: SpeciesSuggestionRow[];
   aliasSuggestions: AliasSuggestionRow[];
+  admins: AdminProfileRow[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -84,14 +89,23 @@ export function AdminPanel({
     setLs(l.species_id);
   }
 
+  const pendingSpeciesCount = speciesSuggestions.filter((s) => s.status === "pending").length;
+  const pendingAliasCount = aliasSuggestions.filter((s) => s.status === "pending").length;
+
   return (
     <>
     <Tabs defaultValue="species-queue">
       <TabsList className="flex h-auto flex-wrap">
-        <TabsTrigger value="species-queue">Species queue</TabsTrigger>
-        <TabsTrigger value="alias-queue">Alias queue</TabsTrigger>
+        <TabsTrigger value="species-queue">
+          Pending species{pendingSpeciesCount > 0 ? ` (${pendingSpeciesCount})` : ""}
+        </TabsTrigger>
+        <TabsTrigger value="alias-queue">
+          Pending aliases{pendingAliasCount > 0 ? ` (${pendingAliasCount})` : ""}
+        </TabsTrigger>
+        <TabsTrigger value="history">History</TabsTrigger>
+        <TabsTrigger value="manage-admins">Manage admins</TabsTrigger>
         <TabsTrigger value="logs">All logs</TabsTrigger>
-        <TabsTrigger value="species">Species</TabsTrigger>
+        <TabsTrigger value="species">Species catalog</TabsTrigger>
         <TabsTrigger value="merge">Merge duplicates</TabsTrigger>
       </TabsList>
 
@@ -111,6 +125,18 @@ export function AdminPanel({
           profileMap={profileMap}
           mode="alias"
         />
+      </TabsContent>
+
+      <TabsContent value="history">
+        <AdminSuggestionHistory
+          speciesSuggestions={speciesSuggestions}
+          aliasSuggestions={aliasSuggestions}
+          profileMap={profileMap}
+        />
+      </TabsContent>
+
+      <TabsContent value="manage-admins">
+        <AdminManageAdmins initialAdmins={admins} />
       </TabsContent>
 
       <TabsContent value="logs">

@@ -11,6 +11,7 @@ import {
 } from "@/lib/points";
 import { weekStartSundayUtc } from "@/lib/time";
 import { isSchemaMissingError } from "@/lib/supabase/errors";
+import { requireAdminProfile } from "@/lib/supabase/admin-auth";
 
 export type LogFoodResult =
   | {
@@ -173,8 +174,8 @@ export async function adminUpdateFoodLogAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorized" };
 
-  const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!prof?.is_admin) return { ok: false, error: "Forbidden" };
+  const prof = await requireAdminProfile(supabase, user.id);
+  if (!prof) return { ok: false, error: "Forbidden" };
 
   const patch: Record<string, unknown> = {};
   if (input.notes !== undefined) patch.notes = input.notes;
@@ -196,8 +197,8 @@ export async function adminDeleteFoodLogAction(id: string): Promise<{ ok: true }
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorized" };
 
-  const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!prof?.is_admin) return { ok: false, error: "Forbidden" };
+  const prof = await requireAdminProfile(supabase, user.id);
+  if (!prof) return { ok: false, error: "Forbidden" };
 
   const { error } = await supabase.from("food_logs").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };

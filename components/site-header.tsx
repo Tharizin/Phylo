@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Leaf, LogOut, Menu, Moon, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { checkCurrentUserIsAdminAction, getPendingSuggestionCountAction } from "@/app/actions/admin";
 import { createClient } from "@/lib/supabase/client";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,6 +27,7 @@ export function SiteHeader() {
   const { theme, setTheme } = useTheme();
   const supabase = useMemo(() => createClient(), []);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [profile, setProfile] = useState<{ username: string; avatar_url: string | null } | null>(null);
 
@@ -42,28 +45,36 @@ export function SiteHeader() {
           setIsSignedIn(false);
           setProfile(null);
           setIsAdmin(false);
+          setPendingCount(0);
         }
         return;
       }
       if (!cancelled) setIsSignedIn(true);
-      let data: { username: string; is_admin?: boolean; avatar_url?: string | null } | null = null;
+      let data: { username: string; avatar_url?: string | null } | null = null;
       const withAvatar = await supabase
         .from("profiles")
-        .select("username, avatar_url, is_admin")
+        .select("username, avatar_url")
         .eq("id", user.id)
         .maybeSingle();
       if (!withAvatar.error && withAvatar.data) {
         data = withAvatar.data;
-      } else {
-        const basic = await supabase.from("profiles").select("username, is_admin").eq("id", user.id).maybeSingle();
-        if (!basic.error && basic.data) data = basic.data;
       }
       if (!cancelled && data) {
-        setIsAdmin(!!data.is_admin);
         setProfile({
           username: data.username as string,
           avatar_url: (data.avatar_url as string | null) ?? null,
         });
+      }
+
+      const adminRes = await checkCurrentUserIsAdminAction();
+      if (!cancelled && adminRes.ok) {
+        setIsAdmin(adminRes.isAdmin);
+        if (adminRes.isAdmin) {
+          const countRes = await getPendingSuggestionCountAction();
+          if (!cancelled && countRes.ok) setPendingCount(countRes.count);
+        } else {
+          setPendingCount(0);
+        }
       }
     })();
     return () => {
@@ -78,13 +89,20 @@ export function SiteHeader() {
         { href: "/history", label: "History" },
         { href: "/community", label: "Community" },
         { href: "/help", label: "Help" },
-        ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
+        ...(isAdmin ? [{ href: "/admin", label: "Admin", badge: pendingCount }] : []),
       ]
     : [];
 
-  const navLink = (href: string, label: string) => (
-    <Button variant="ghost" size="sm" asChild className={cn(pathname === href && "bg-muted")}>
-      <Link href={href}>{label}</Link>
+  const navLink = (href: string, label: string, badge?: number) => (
+    <Button variant="ghost" size="sm" asChild className={cn(pathname === href && "bg-muted", "relative")}>
+      <Link href={href}>
+        {label}
+        {badge && badge > 0 ? (
+          <Badge className="ml-2 border-transparent bg-amber-500 px-1.5 py-0 text-[10px] text-white hover:bg-amber-500">
+            {badge}
+          </Badge>
+        ) : null}
+      </Link>
     </Button>
   );
 
@@ -152,15 +170,20 @@ export function SiteHeader() {
         <div className="flex items-center gap-1">
           <nav className="hidden items-center gap-1 md:flex">
             {navItems.map((item) => (
-              <span key={item.href}>{navLink(item.href, item.label)}</span>
+              <span key={item.href}>{navLink(item.href, item.label, item.badge)}</span>
             ))}
           </nav>
 
           {navItems.length > 0 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="shrink-0 md:hidden" aria-label="Open navigation menu">
+                <Button variant="ghost" size="icon" className="relative shrink-0 md:hidden" aria-label="Open navigation menu">
                   <Menu className="h-5 w-5" />
+                  {isAdmin && pendingCount > 0 ? (
+                    <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white">
+                      {pendingCount > 9 ? "9+" : pendingCount}
+                    </span>
+                  ) : null}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
@@ -168,9 +191,14 @@ export function SiteHeader() {
                   <DropdownMenuItem key={item.href} asChild>
                     <Link
                       href={item.href}
-                      className={cn("w-full cursor-pointer", pathname === item.href && "bg-muted font-medium")}
+                      className={cn("flex w-full cursor-pointer items-center justify-between", pathname === item.href && "bg-muted font-medium")}
                     >
-                      {item.label}
+                      <span>{item.label}</span>
+                      {item.badge && item.badge > 0 ? (
+                        <Badge className="border-transparent bg-amber-500 px-1.5 py-0 text-[10px] text-white hover:bg-amber-500">
+                          {item.badge}
+                        </Badge>
+                      ) : null}
                     </Link>
                   </DropdownMenuItem>
                 ))}

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeSpeciesJoin } from "@/lib/supabase/relations";
-import { AllTimeSpeciesTable } from "@/components/all-time-species-table";
+import { AllTimeSpeciesView } from "@/components/all-time-species-view";
 
 export default async function SpeciesPage() {
   const supabase = await createClient();
@@ -56,7 +56,7 @@ export default async function SpeciesPage() {
           Every unique species you&apos;ve logged, with how many times each appears in your history.
         </p>
       </div>
-      <AllTimeSpeciesTable initial={rows} />
+      <AllTimeSpeciesView initial={rows} />
     </div>
   );
 }

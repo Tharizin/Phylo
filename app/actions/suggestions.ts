@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError } from "@/lib/supabase/errors";
+import { requireAdminProfile } from "@/lib/supabase/admin-auth";
 
 export type SpeciesSuggestionRow = {
   id: string;
@@ -37,8 +38,8 @@ async function requireAdmin() {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, error: "Unauthorized", supabase: null };
 
-  const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
-  if (!prof?.is_admin) return { ok: false as const, error: "Forbidden", supabase: null };
+  const prof = await requireAdminProfile(supabase, user.id);
+  if (!prof) return { ok: false as const, error: "Forbidden", supabase: null };
 
   return { ok: true as const, supabase, userId: user.id };
 }
@@ -113,6 +114,7 @@ export async function submitSpeciesSuggestionAction(input: {
     return { ok: false, error: error.message };
   }
 
+  revalidatePath("/profile");
   return { ok: true };
 }
 
@@ -157,12 +159,14 @@ export async function submitAliasSuggestionAction(input: {
     return { ok: false, error: error.message };
   }
 
+  revalidatePath("/profile");
   return { ok: true };
 }
 
-export async function adminApproveSpeciesSuggestionAction(
-  id: string
-): Promise<{ ok: true; speciesId: string } | { ok: false; error: string }> {
+export async function adminApproveSpeciesSuggestionAction(input: {
+  id: string;
+  reviewerNotes?: string;
+}): Promise<{ ok: true; speciesId: string } | { ok: false; error: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return { ok: false, error: auth.error };
   const { supabase } = auth;
@@ -170,7 +174,7 @@ export async function adminApproveSpeciesSuggestionAction(
   const { data: suggestion, error: fetchErr } = await supabase
     .from("species_suggestions")
     .select("*")
-    .eq("id", id)
+    .eq("id", input.id)
     .eq("status", "pending")
     .maybeSingle();
 
@@ -210,14 +214,19 @@ export async function adminApproveSpeciesSuggestionAction(
 
   const { error: updateErr } = await supabase
     .from("species_suggestions")
-    .update({ status: "approved", reviewed_at: new Date().toISOString(), reviewer_notes: null })
-    .eq("id", id);
+    .update({
+      status: "approved",
+      reviewed_at: new Date().toISOString(),
+      reviewer_notes: input.reviewerNotes?.trim() || null,
+    })
+    .eq("id", input.id);
 
   if (updateErr) return { ok: false, error: updateErr.message };
 
   revalidatePath("/admin");
   revalidatePath("/dashboard");
   revalidatePath("/species");
+  revalidatePath("/profile");
   return { ok: true, speciesId: inserted.id as string };
 }
 
@@ -241,12 +250,14 @@ export async function adminRejectSpeciesSuggestionAction(input: {
 
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin");
+  revalidatePath("/profile");
   return { ok: true };
 }
 
-export async function adminApproveAliasSuggestionAction(
-  id: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function adminApproveAliasSuggestionAction(input: {
+  id: string;
+  reviewerNotes?: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return { ok: false, error: auth.error };
   const { supabase } = auth;
@@ -254,7 +265,7 @@ export async function adminApproveAliasSuggestionAction(
   const { data: suggestion, error: fetchErr } = await supabase
     .from("alias_suggestions")
     .select("id, species_id, suggested_alias")
-    .eq("id", id)
+    .eq("id", input.id)
     .eq("status", "pending")
     .maybeSingle();
 
@@ -288,13 +299,18 @@ export async function adminApproveAliasSuggestionAction(
 
   const { error: updateErr } = await supabase
     .from("alias_suggestions")
-    .update({ status: "approved", reviewed_at: new Date().toISOString(), reviewer_notes: null })
-    .eq("id", id);
+    .update({
+      status: "approved",
+      reviewed_at: new Date().toISOString(),
+      reviewer_notes: input.reviewerNotes?.trim() || null,
+    })
+    .eq("id", input.id);
 
   if (updateErr) return { ok: false, error: updateErr.message };
 
   revalidatePath("/admin");
   revalidatePath("/dashboard");
+  revalidatePath("/profile");
   return { ok: true };
 }
 
@@ -318,5 +334,6 @@ export async function adminRejectAliasSuggestionAction(input: {
 
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin");
+  revalidatePath("/profile");
   return { ok: true };
 }
