@@ -29,7 +29,7 @@ export type BubbleColorPalette = {
 };
 
 export const CANVAS_SCALE = 3;
-export const COLLISION_PADDING = 8;
+export const COLLISION_PADDING = 3;
 
 const CSS_VAR_MAP: Record<string, { fill: string; stroke: string }> = {
   plant: { fill: "--bubble-plant-fill", stroke: "--bubble-plant-stroke" },
@@ -142,19 +142,73 @@ export function applyFriendGapMode(
   }));
 }
 
+export function clusterCentroid(nodes: { x: number; y: number }[]): { x: number; y: number } {
+  if (nodes.length === 0) return { x: 0, y: 0 };
+  let x = 0;
+  let y = 0;
+  for (const node of nodes) {
+    x += node.x;
+    y += node.y;
+  }
+  return { x: x / nodes.length, y: y / nodes.length };
+}
+
+/** @deprecated use clusterCentroid for viewport framing */
 export function weightedClusterCenter(nodes: { x: number; y: number; logCount: number }[]): {
   x: number;
   y: number;
 } {
-  if (nodes.length === 0) return { x: 0, y: 0 };
-  let total = 0;
-  let x = 0;
-  let y = 0;
-  for (const node of nodes) {
-    const w = Math.max(node.logCount, 1);
-    total += w;
-    x += node.x * w;
-    y += node.y * w;
+  return clusterCentroid(nodes);
+}
+
+export type PackedBubbleNode = {
+  x: number;
+  y: number;
+  r: number;
+  logCount: number;
+};
+
+export type ViewTransform = {
+  x: number;
+  y: number;
+  k: number;
+};
+
+/** Fit the packed cluster into the viewport, centered on its geometric centroid. */
+export function computeInitialViewTransform(
+  nodes: PackedBubbleNode[],
+  viewportWidth: number,
+  viewportHeight: number,
+  padding = 48
+): ViewTransform {
+  if (nodes.length === 0) {
+    return { x: viewportWidth / 2, y: viewportHeight / 2, k: 1 };
   }
-  return { x: x / total, y: y / total };
+
+  const centroid = clusterCentroid(nodes);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  for (const node of nodes) {
+    minX = Math.min(minX, node.x - node.r);
+    maxX = Math.max(maxX, node.x + node.r);
+    minY = Math.min(minY, node.y - node.r);
+    maxY = Math.max(maxY, node.y + node.r);
+  }
+
+  const clusterWidth = Math.max(maxX - minX, 1);
+  const clusterHeight = Math.max(maxY - minY, 1);
+  const k = Math.min(
+    (viewportWidth - padding * 2) / clusterWidth,
+    (viewportHeight - padding * 2) / clusterHeight,
+    2.2
+  );
+
+  return {
+    k,
+    x: viewportWidth / 2 - centroid.x * k,
+    y: viewportHeight / 2 - centroid.y * k,
+  };
 }

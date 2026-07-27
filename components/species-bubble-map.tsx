@@ -8,11 +8,12 @@ import {
   categoryEmoji,
   readBubbleColorPalette,
   resolveBubbleColors,
-  weightedClusterCenter,
+  computeInitialViewTransform,
   bubbleRadius,
   type BubbleColorPalette,
   type SpeciesBubbleMode,
   type SpeciesBubbleNode,
+  type ViewTransform,
 } from "@/lib/species-bubble";
 import { MapInfoButton } from "@/components/species-bubble-map-chrome";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -57,7 +58,7 @@ export function SpeciesBubbleMap({
   const [palette, setPalette] = useState<BubbleColorPalette>(() => readBubbleColorPalette());
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [simNodes, setSimNodes] = useState<SimNode[]>([]);
-  const [clusterCenter, setClusterCenter] = useState<{ x: number; y: number } | null>(null);
+  const [initialViewTransform, setInitialViewTransform] = useState<ViewTransform | null>(null);
 
   const canvas = useMemo(
     () => ({
@@ -98,62 +99,55 @@ export function SpeciesBubbleMap({
     initialViewApplied.current = false;
     if (loading || nodes.length < requireMinNodes) {
       setSimNodes([]);
-      setClusterCenter(null);
+      setInitialViewTransform(null);
       return;
     }
 
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
-    const maxRadial = Math.min(canvas.width, canvas.height) * 0.38;
 
-    const prepared: SimNode[] = nodes.map((node, index) => {
-      const angle = (index / nodes.length) * Math.PI * 2;
+    const prepared: SimNode[] = nodes.map((node) => {
       const r = bubbleRadius(node.logCount, minCount, maxCount);
       return {
         ...node,
         r,
-        x: centerX + Math.cos(angle) * maxRadial * 0.2,
-        y: centerY + Math.sin(angle) * maxRadial * 0.2,
+        x: centerX + (Math.random() - 0.5) * 48,
+        y: centerY + (Math.random() - 0.5) * 48,
       };
     });
+    prepared.sort((a, b) => b.r - a.r);
 
     const maxLog = Math.max(...prepared.map((n) => n.logCount), 1);
 
     const simulation = d3
       .forceSimulation(prepared)
+      .force("center", d3.forceCenter(centerX, centerY).strength(0.14))
       .force(
         "collide",
         d3
           .forceCollide<SimNode>((d) => d.r + COLLISION_PADDING)
           .strength(1)
-          .iterations(6)
+          .iterations(8)
       )
       .force(
-        "radial",
-        d3
-          .forceRadial<SimNode>(
-            (d) => {
-              const t = d.logCount / maxLog;
-              return maxRadial * (0.15 + (1 - t) * 0.85);
-            },
-            centerX,
-            centerY
-          )
-          .strength(0.9)
+        "x",
+        d3.forceX<SimNode>(centerX).strength((d) => 0.012 + (d.logCount / maxLog) * 0.028)
       )
-      .force("charge", d3.forceManyBody().strength(-28))
+      .force(
+        "y",
+        d3.forceY<SimNode>(centerY).strength((d) => 0.012 + (d.logCount / maxLog) * 0.028)
+      )
+      .alphaDecay(0.012)
+      .alphaMin(0.001)
       .stop();
 
-    for (let i = 0; i < 520; i += 1) simulation.tick();
+    while (simulation.alpha() > simulation.alphaMin()) {
+      simulation.tick();
+    }
 
-    prepared.forEach((node) => {
-      node.x = Math.max(node.r + COLLISION_PADDING, Math.min(canvas.width - node.r - COLLISION_PADDING, node.x));
-      node.y = Math.max(node.r + COLLISION_PADDING, Math.min(canvas.height - node.r - COLLISION_PADDING, node.y));
-    });
-
-    setClusterCenter(weightedClusterCenter(prepared));
+    setInitialViewTransform(computeInitialViewTransform(prepared, viewport.width, viewport.height));
     setSimNodes([...prepared]);
-  }, [loading, nodes, canvas.width, canvas.height, minCount, maxCount, requireMinNodes]);
+  }, [loading, nodes, canvas.width, canvas.height, viewport.width, viewport.height, minCount, maxCount, requireMinNodes]);
 
   useEffect(() => {
     const svgEl = svgRef.current;
@@ -170,11 +164,9 @@ export function SpeciesBubbleMap({
     zoomRef.current = zoom;
     svg.call(zoom as never);
 
-    if (!initialViewApplied.current && clusterCenter) {
-      const k = 1;
-      const tx = viewport.width / 2 - clusterCenter.x * k;
-      const ty = viewport.height / 2 - clusterCenter.y * k;
-      const transform = d3.zoomIdentity.translate(tx, ty).scale(k);
+    if (!initialViewApplied.current && initialViewTransform) {
+      const { x, y, k } = initialViewTransform;
+      const transform = d3.zoomIdentity.translate(x, y).scale(k);
       svg.call(zoom.transform as never, transform);
       initialViewApplied.current = true;
     }
@@ -183,7 +175,7 @@ export function SpeciesBubbleMap({
       svg.on(".zoom", null);
       zoomRef.current = null;
     };
-  }, [loading, simNodes, clusterCenter, viewport.width, viewport.height, requireMinNodes]);
+  }, [loading, simNodes, initialViewTransform, requireMinNodes]);
 
   const shellClass = fullscreen
     ? "fixed inset-x-0 top-14 z-0 h-[calc(100vh-3.5rem)] w-full"

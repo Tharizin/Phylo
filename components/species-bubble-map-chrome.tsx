@@ -1,32 +1,19 @@
 "use client";
 
 import { Info } from "lucide-react";
-import {
-  CANVAS_SCALE,
-  COLLISION_PADDING,
-  categoryEmoji,
-  readBubbleColorPalette,
-  resolveBubbleColors,
-  weightedClusterCenter,
-  bubbleRadius,
-  type BubbleColorPalette,
-  type SpeciesBubbleMode,
-  type SpeciesBubbleNode,
-} from "@/lib/species-bubble";
+import { type SpeciesBubbleMode } from "@/lib/species-bubble";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 
 const MAP_HELP: Record<SpeciesBubbleMode, string[]> = {
   personal: [
     "Circle size reflects how often you've logged that species.",
-    "Favorites cluster toward the center; pan and zoom to explore the full map.",
+    "Species pack together in a dense cluster — pan and zoom to explore.",
     "Colors match category: plant, animal, and fungus.",
   ],
   community: [
     "Circle size reflects total logs across all Phylo users.",
-    "Pan and zoom to explore — the map extends beyond the screen.",
+    "The community catalog packs into one dense cluster — pan to explore.",
     "Hover a bubble for platform-wide stats.",
   ],
   friend: [
