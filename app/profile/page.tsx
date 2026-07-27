@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { markSuggestionsNotifiedAction } from "@/app/actions/suggestions";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeSpeciesJoin } from "@/lib/supabase/relations";
 import { ProfileSettings } from "@/components/profile-settings";
@@ -10,6 +11,8 @@ export default async function ProfilePage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  await markSuggestionsNotifiedAction();
 
   let username = user.email?.split("@")[0] ?? "User";
   let avatarUrl: string | null = null;

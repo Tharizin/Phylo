@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Leaf, LogOut, Menu, Moon, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { checkCurrentUserIsAdminAction, getPendingSuggestionCountAction } from "@/app/actions/admin";
+import { getUnreadApprovedSuggestionCountAction } from "@/app/actions/suggestions";
 import { createClient } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export function SiteHeader() {
   const supabase = useMemo(() => createClient(), []);
   const [isAdmin, setIsAdmin] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [approvedSuggestionCount, setApprovedSuggestionCount] = useState(0);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [profile, setProfile] = useState<{ username: string; avatar_url: string | null } | null>(null);
 
@@ -46,6 +48,7 @@ export function SiteHeader() {
           setProfile(null);
           setIsAdmin(false);
           setPendingCount(0);
+          setApprovedSuggestionCount(0);
         }
         return;
       }
@@ -76,6 +79,11 @@ export function SiteHeader() {
           setPendingCount(0);
         }
       }
+
+      const approvedRes = await getUnreadApprovedSuggestionCountAction();
+      if (!cancelled && approvedRes.ok) {
+        setApprovedSuggestionCount(pathname?.startsWith("/profile") ? 0 : approvedRes.count);
+      }
     })();
     return () => {
       cancelled = true;
@@ -88,7 +96,7 @@ export function SiteHeader() {
         { href: "/species", label: "Species" },
         { href: "/history", label: "History" },
         { href: "/community", label: "Community" },
-        { href: "/help", label: "Help" },
+        { href: "/about", label: "About" },
         ...(isAdmin ? [{ href: "/admin", label: "Admin", badge: pendingCount }] : []),
       ]
     : [];
@@ -123,18 +131,30 @@ export function SiteHeader() {
   const accountMenu = showAuthedNav ? (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="shrink-0 gap-2 pl-1.5">
+        <Button variant="outline" size="sm" className="relative shrink-0 gap-2 pl-1.5">
           {profile ? <UserAvatar username={profile.username} avatarUrl={profile.avatar_url} size="sm" /> : null}
           <span className="hidden sm:inline">{profile?.username ?? "Account"}</span>
+          {approvedSuggestionCount > 0 ? (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white">
+              {approvedSuggestionCount > 9 ? "9+" : approvedSuggestionCount}
+            </span>
+          ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel>{profile?.username ?? "Account"}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/profile">
-            <Settings className="mr-2 h-4 w-4" />
-            Profile settings
+          <Link href="/profile" className="flex w-full cursor-pointer items-center justify-between">
+            <span className="flex items-center">
+              <Settings className="mr-2 h-4 w-4" />
+              Profile settings
+            </span>
+            {approvedSuggestionCount > 0 ? (
+              <Badge className="border-transparent bg-amber-500 px-1.5 py-0 text-[10px] text-white hover:bg-amber-500">
+                {approvedSuggestionCount}
+              </Badge>
+            ) : null}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -179,9 +199,15 @@ export function SiteHeader() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative shrink-0 md:hidden" aria-label="Open navigation menu">
                   <Menu className="h-5 w-5" />
-                  {isAdmin && pendingCount > 0 ? (
+                  {((isAdmin && pendingCount > 0) || approvedSuggestionCount > 0) ? (
                     <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white">
-                      {pendingCount > 9 ? "9+" : pendingCount}
+                      {isAdmin && pendingCount > 0
+                        ? pendingCount > 9
+                          ? "9+"
+                          : pendingCount
+                        : approvedSuggestionCount > 9
+                          ? "9+"
+                          : approvedSuggestionCount}
                     </span>
                   ) : null}
                 </Button>

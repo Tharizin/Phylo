@@ -15,6 +15,7 @@ export type SpeciesSuggestionRow = {
   notes: string | null;
   status: string;
   reviewer_notes: string | null;
+  notified?: boolean;
   created_at: string;
   reviewed_at: string | null;
 };
@@ -26,6 +27,7 @@ export type AliasSuggestionRow = {
   suggested_alias: string;
   status: string;
   reviewer_notes: string | null;
+  notified?: boolean;
   created_at: string;
   reviewed_at: string | null;
   species: { common_name: string; latin_name: string | null };
@@ -218,6 +220,7 @@ export async function adminApproveSpeciesSuggestionAction(input: {
       status: "approved",
       reviewed_at: new Date().toISOString(),
       reviewer_notes: input.reviewerNotes?.trim() || null,
+      notified: false,
     })
     .eq("id", input.id);
 
@@ -303,6 +306,7 @@ export async function adminApproveAliasSuggestionAction(input: {
       status: "approved",
       reviewed_at: new Date().toISOString(),
       reviewer_notes: input.reviewerNotes?.trim() || null,
+      notified: false,
     })
     .eq("id", input.id);
 
@@ -334,6 +338,77 @@ export async function adminRejectAliasSuggestionAction(input: {
 
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin");
+  revalidatePath("/profile");
+  return { ok: true };
+}
+
+export async function getUnreadApprovedSuggestionCountAction(): Promise<
+  { ok: true; count: number } | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: true, count: 0 };
+
+  const [speciesRes, aliasRes] = await Promise.all([
+    supabase
+      .from("species_suggestions")
+      .select("id", { count: "exact", head: true })
+      .eq("submitted_by", user.id)
+      .eq("status", "approved")
+      .eq("notified", false),
+    supabase
+      .from("alias_suggestions")
+      .select("id", { count: "exact", head: true })
+      .eq("submitted_by", user.id)
+      .eq("status", "approved")
+      .eq("notified", false),
+  ]);
+
+  if (speciesRes.error) {
+    if (isSchemaMissingError(speciesRes.error.message)) return { ok: true, count: 0 };
+    return { ok: false, error: speciesRes.error.message };
+  }
+  if (aliasRes.error) {
+    if (isSchemaMissingError(aliasRes.error.message)) return { ok: true, count: 0 };
+    return { ok: false, error: aliasRes.error.message };
+  }
+
+  return { ok: true, count: (speciesRes.count ?? 0) + (aliasRes.count ?? 0) };
+}
+
+export async function markSuggestionsNotifiedAction(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Unauthorized" };
+
+  const [speciesRes, aliasRes] = await Promise.all([
+    supabase
+      .from("species_suggestions")
+      .update({ notified: true })
+      .eq("submitted_by", user.id)
+      .eq("status", "approved")
+      .eq("notified", false),
+    supabase
+      .from("alias_suggestions")
+      .update({ notified: true })
+      .eq("submitted_by", user.id)
+      .eq("status", "approved")
+      .eq("notified", false),
+  ]);
+
+  if (speciesRes.error) {
+    if (isSchemaMissingError(speciesRes.error.message)) return { ok: true };
+    return { ok: false, error: speciesRes.error.message };
+  }
+  if (aliasRes.error) {
+    if (isSchemaMissingError(aliasRes.error.message)) return { ok: true };
+    return { ok: false, error: aliasRes.error.message };
+  }
+
   revalidatePath("/profile");
   return { ok: true };
 }
