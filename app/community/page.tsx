@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCommunityUsersAction } from "@/app/actions/community";
+import { getCommunitySpeciesTotalAction } from "@/app/actions/species-map";
 import { CommunityPanel } from "@/components/community-panel";
+import { CommunitySpeciesExplorer } from "@/components/community-species-explorer";
 
 export default async function CommunityPage() {
   const supabase = await createClient();
@@ -10,7 +12,7 @@ export default async function CommunityPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const result = await getCommunityUsersAction();
+  const [result, totalRes] = await Promise.all([getCommunityUsersAction(), getCommunitySpeciesTotalAction()]);
 
   if (!result.ok) {
     return (
@@ -20,12 +22,14 @@ export default async function CommunityPage() {
     );
   }
 
+  const totalUniqueSpecies = totalRes.ok ? totalRes.total : 0;
+
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-10">
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-10">
       <div>
         <h1 className="text-3xl font-semibold">Community</h1>
         <p className="mt-2 text-muted-foreground">
-          Find other Phylo members, send friend requests, and see how everyone is diversifying their diet.
+          Find other Phylo members, send friend requests, and discover new foods from their species maps.
         </p>
         {result.partial ? (
           <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
@@ -35,6 +39,9 @@ export default async function CommunityPage() {
           </p>
         ) : null}
       </div>
+
+      <CommunitySpeciesExplorer totalUniqueSpecies={totalUniqueSpecies} />
+
       <CommunityPanel currentUserId={user.id} users={result.users} />
     </div>
   );

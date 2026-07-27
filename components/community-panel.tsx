@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, UserCheck, UserMinus, UserPlus } from "lucide-react";
 import {
@@ -55,7 +56,9 @@ export function CommunityPanel({ users, currentUserId }: { users: CommunityUser[
             <UserAvatar username={u.username} avatarUrl={u.avatar_url} />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate font-medium">{u.username}</p>
+                <Link href={`/community/${u.user_id}`} className="truncate font-medium hover:underline">
+                  {u.username}
+                </Link>
                 {isSelf ? <Badge variant="secondary">You</Badge> : null}
                 {u.is_friend && !isSelf ? <Badge variant="outline">Friend</Badge> : null}
               </div>
@@ -73,7 +76,10 @@ export function CommunityPanel({ users, currentUserId }: { users: CommunityUser[
             </div>
           </div>
           {!isSelf ? (
-            <div className="flex shrink-0 gap-2">
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button size="sm" variant="secondary" asChild>
+                <Link href={`/community/${u.user_id}`}>View map</Link>
+              </Button>
               {u.is_pending_incoming && u.friendship_id ? (
                 <>
                   <Button
