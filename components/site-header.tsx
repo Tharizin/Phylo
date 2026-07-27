@@ -21,7 +21,7 @@ import {
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 
-const authedPrefixes = ["/dashboard", "/history", "/species", "/community", "/profile", "/admin"];
+const authedPrefixes = ["/dashboard", "/history", "/species", "/community", "/profile", "/admin", "/about"];
 
 export function SiteHeader() {
   const pathname = usePathname();

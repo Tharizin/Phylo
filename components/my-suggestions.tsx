@@ -20,19 +20,27 @@ function statusBadge(status: string) {
 export function MySuggestions({
   speciesSuggestions,
   aliasSuggestions,
+  unreadReviewCount = 0,
 }: {
   speciesSuggestions: SpeciesSuggestionRow[];
   aliasSuggestions: AliasSuggestionRow[];
+  unreadReviewCount?: number;
 }) {
   const hasAny = speciesSuggestions.length > 0 || aliasSuggestions.length > 0;
 
   return (
-    <Card>
+    <Card id="my-suggestions">
       <CardHeader>
         <CardTitle>My suggestions</CardTitle>
         <CardDescription>Track species and alias contributions you&apos;ve submitted for review.</CardDescription>
       </CardHeader>
       <CardContent>
+        {unreadReviewCount > 0 ? (
+          <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+            You have {unreadReviewCount} reviewed suggestion{unreadReviewCount === 1 ? "" : "s"} — see the status
+            updates below.
+          </p>
+        ) : null}
         {!hasAny ? (
           <p className="rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
             You haven&apos;t submitted any suggestions yet. When you search for a species on the dashboard and can&apos;t

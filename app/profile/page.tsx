@@ -12,6 +12,26 @@ export default async function ProfilePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const { data: speciesSuggestionsRaw } = await supabase
+    .from("species_suggestions")
+    .select("*")
+    .eq("submitted_by", user.id)
+    .order("created_at", { ascending: false });
+
+  const { data: aliasSuggestionsRaw } = await supabase
+    .from("alias_suggestions")
+    .select("*, species ( common_name, latin_name )")
+    .eq("submitted_by", user.id)
+    .order("created_at", { ascending: false });
+
+  const unreadReviewCount =
+    (speciesSuggestionsRaw ?? []).filter(
+      (row) => (row.status === "approved" || row.status === "rejected") && row.notified === false
+    ).length +
+    (aliasSuggestionsRaw ?? []).filter(
+      (row) => (row.status === "approved" || row.status === "rejected") && row.notified === false
+    ).length;
+
   await markSuggestionsNotifiedAction();
 
   let username = user.email?.split("@")[0] ?? "User";
@@ -26,18 +46,6 @@ export default async function ProfilePage() {
     if (!basic.error && basic.data) username = basic.data.username as string;
   }
 
-  const { data: speciesSuggestions } = await supabase
-    .from("species_suggestions")
-    .select("*")
-    .eq("submitted_by", user.id)
-    .order("created_at", { ascending: false });
-
-  const { data: aliasSuggestionsRaw } = await supabase
-    .from("alias_suggestions")
-    .select("*, species ( common_name, latin_name )")
-    .eq("submitted_by", user.id)
-    .order("created_at", { ascending: false });
-
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-10">
       <div>
@@ -46,7 +54,8 @@ export default async function ProfilePage() {
       </div>
       <ProfileSettings username={username} avatarUrl={avatarUrl} email={user.email ?? ""} />
       <MySuggestions
-        speciesSuggestions={(speciesSuggestions ?? []).map((s) => ({
+        unreadReviewCount={unreadReviewCount}
+        speciesSuggestions={(speciesSuggestionsRaw ?? []).map((s) => ({
           id: s.id as string,
           submitted_by: s.submitted_by as string,
           common_name: s.common_name as string,

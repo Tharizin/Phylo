@@ -17,7 +17,13 @@ function renderParagraph(section: AboutSection["paragraphs"][number]): ReactNode
     const link = section.links?.[index];
     if (link) {
       parts.push(
-        <a key={`${key}-${index}`} href={link.href} className="font-medium text-primary underline-offset-4 hover:underline">
+        <a
+          key={`${key}-${index}`}
+          href={link.href}
+          target={link.href.startsWith("http") ? "_blank" : undefined}
+          rel={link.href.startsWith("http") ? "noopener noreferrer" : undefined}
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
           {link.label}
         </a>
       );

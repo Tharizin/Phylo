@@ -53,6 +53,32 @@ function parseAlternativeNames(raw: string): string[] {
     .filter(Boolean);
 }
 
+async function markSuggestionRejected(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  table: "species_suggestions" | "alias_suggestions",
+  id: string,
+  reviewerNotes?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const payload = {
+    status: "rejected" as const,
+    reviewed_at: new Date().toISOString(),
+    reviewer_notes: reviewerNotes?.trim() || null,
+    notified: false,
+  };
+
+  const { error } = await supabase.from(table).update(payload).eq("id", id).eq("status", "pending");
+  if (!error) return { ok: true };
+
+  if (isSchemaMissingError(error.message)) {
+    const { notified: _notified, ...withoutNotified } = payload;
+    const retry = await supabase.from(table).update(withoutNotified).eq("id", id).eq("status", "pending");
+    if (retry.error) return { ok: false, error: retry.error.message };
+    return { ok: true };
+  }
+
+  return { ok: false, error: error.message };
+}
+
 async function markSuggestionApproved(
   supabase: Awaited<ReturnType<typeof createClient>>,
   table: "species_suggestions" | "alias_suggestions",
@@ -77,6 +103,39 @@ async function markSuggestionApproved(
   }
 
   return { ok: false, error: error.message };
+}
+
+const REVIEWED_STATUSES = ["approved", "rejected"] as const;
+
+async function countUnreadSuggestionReviews(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  const [speciesRes, aliasRes] = await Promise.all([
+    supabase
+      .from("species_suggestions")
+      .select("id")
+      .eq("submitted_by", userId)
+      .in("status", [...REVIEWED_STATUSES])
+      .eq("notified", false),
+    supabase
+      .from("alias_suggestions")
+      .select("id")
+      .eq("submitted_by", userId)
+      .in("status", [...REVIEWED_STATUSES])
+      .eq("notified", false),
+  ]);
+
+  if (speciesRes.error) {
+    if (isSchemaMissingError(speciesRes.error.message)) return { ok: true, count: 0 };
+    return { ok: false, error: speciesRes.error.message };
+  }
+  if (aliasRes.error) {
+    if (isSchemaMissingError(aliasRes.error.message)) return { ok: true, count: 0 };
+    return { ok: false, error: aliasRes.error.message };
+  }
+
+  return { ok: true, count: (speciesRes.data?.length ?? 0) + (aliasRes.data?.length ?? 0) };
 }
 
 function normalizeName(name: string): string {
@@ -258,17 +317,9 @@ export async function adminRejectSpeciesSuggestionAction(input: {
   if (!auth.ok) return { ok: false, error: auth.error };
   const { supabase } = auth;
 
-  const { error } = await supabase
-    .from("species_suggestions")
-    .update({
-      status: "rejected",
-      reviewed_at: new Date().toISOString(),
-      reviewer_notes: input.reviewerNotes?.trim() || null,
-    })
-    .eq("id", input.id)
-    .eq("status", "pending");
+  const rejection = await markSuggestionRejected(supabase, "species_suggestions", input.id, input.reviewerNotes);
+  if (!rejection.ok) return { ok: false, error: rejection.error };
 
-  if (error) return { ok: false, error: error.message };
   revalidatePath("/admin");
   revalidatePath("/profile");
   return { ok: true };
@@ -334,17 +385,9 @@ export async function adminRejectAliasSuggestionAction(input: {
   if (!auth.ok) return { ok: false, error: auth.error };
   const { supabase } = auth;
 
-  const { error } = await supabase
-    .from("alias_suggestions")
-    .update({
-      status: "rejected",
-      reviewed_at: new Date().toISOString(),
-      reviewer_notes: input.reviewerNotes?.trim() || null,
-    })
-    .eq("id", input.id)
-    .eq("status", "pending");
+  const rejection = await markSuggestionRejected(supabase, "alias_suggestions", input.id, input.reviewerNotes);
+  if (!rejection.ok) return { ok: false, error: rejection.error };
 
-  if (error) return { ok: false, error: error.message };
   revalidatePath("/admin");
   revalidatePath("/profile");
   return { ok: true };
@@ -359,31 +402,7 @@ export async function getUnreadApprovedSuggestionCountAction(): Promise<
   } = await supabase.auth.getUser();
   if (!user) return { ok: true, count: 0 };
 
-  const [speciesRes, aliasRes] = await Promise.all([
-    supabase
-      .from("species_suggestions")
-      .select("id", { count: "exact", head: true })
-      .eq("submitted_by", user.id)
-      .eq("status", "approved")
-      .eq("notified", false),
-    supabase
-      .from("alias_suggestions")
-      .select("id", { count: "exact", head: true })
-      .eq("submitted_by", user.id)
-      .eq("status", "approved")
-      .eq("notified", false),
-  ]);
-
-  if (speciesRes.error) {
-    if (isSchemaMissingError(speciesRes.error.message)) return { ok: true, count: 0 };
-    return { ok: false, error: speciesRes.error.message };
-  }
-  if (aliasRes.error) {
-    if (isSchemaMissingError(aliasRes.error.message)) return { ok: true, count: 0 };
-    return { ok: false, error: aliasRes.error.message };
-  }
-
-  return { ok: true, count: (speciesRes.count ?? 0) + (aliasRes.count ?? 0) };
+  return countUnreadSuggestionReviews(supabase, user.id);
 }
 
 export async function markSuggestionsNotifiedAction(): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -398,13 +417,13 @@ export async function markSuggestionsNotifiedAction(): Promise<{ ok: true } | { 
       .from("species_suggestions")
       .update({ notified: true })
       .eq("submitted_by", user.id)
-      .eq("status", "approved")
+      .in("status", [...REVIEWED_STATUSES])
       .eq("notified", false),
     supabase
       .from("alias_suggestions")
       .update({ notified: true })
       .eq("submitted_by", user.id)
-      .eq("status", "approved")
+      .in("status", [...REVIEWED_STATUSES])
       .eq("notified", false),
   ]);
 
