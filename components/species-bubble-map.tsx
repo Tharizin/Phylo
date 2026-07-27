@@ -11,6 +11,7 @@ import {
   computeInitialViewTransform,
   bubbleRadius,
   fitBubbleLabel,
+  bubbleLabelClipRadius,
   type BubbleColorPalette,
   type SpeciesBubbleMode,
   type SpeciesBubbleNode,
@@ -255,7 +256,7 @@ export function SpeciesBubbleMap({
           <defs>
             {simNodes.map((node) => (
               <clipPath key={`clip-${node.speciesId}`} id={`bubble-label-clip-${node.speciesId}`}>
-                <circle r={node.r * 0.92} />
+                <circle r={bubbleLabelClipRadius(node.r, zoomK)} />
               </clipPath>
             ))}
           </defs>

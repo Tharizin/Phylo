@@ -96,6 +96,36 @@ function computeMaxFontSize(name: string, screenRadius: number, zoomScale: numbe
   return Math.max(LABEL_FONT_MIN, max);
 }
 
+function oneWordPerLine(words: string[], maxWidth: number, fontSize: number): string[] {
+  const lines: string[] = [];
+  for (const word of words) {
+    if (measureLabelWidth(word, fontSize) <= maxWidth) {
+      lines.push(word);
+      continue;
+    }
+    let chunk = "";
+    for (const char of word) {
+      const nextChunk = chunk + char;
+      if (measureLabelWidth(nextChunk, fontSize) <= maxWidth) {
+        chunk = nextChunk;
+      } else {
+        if (chunk) lines.push(chunk);
+        chunk = char;
+      }
+    }
+    if (chunk) lines.push(chunk);
+  }
+  return lines;
+}
+
+function singleLine(words: string[], maxWidth: number, fontSize: number): string[] | null {
+  const line = words.join(" ");
+  if (measureLabelWidth(line, fontSize) <= maxWidth) return [line];
+  return null;
+}
+
+type LineStrategy = (words: string[], maxWidth: number, fontSize: number) => string[] | null;
+
 function wrapWords(words: string[], maxWidth: number, fontSize: number): string[] {
   const lines: string[] = [];
   let current = "";
@@ -134,6 +164,8 @@ function wrapWords(words: string[], maxWidth: number, fontSize: number): string[
   return lines.length > 0 ? lines : [""];
 }
 
+const LINE_STRATEGIES: LineStrategy[] = [singleLine, wrapWords, oneWordPerLine];
+
 function buildLabelLayout(
   lines: string[],
   fontSize: number,
@@ -168,6 +200,11 @@ function layoutFits(
   return lines.every((line) => measureLabelWidth(line, fontSize) <= maxWidth);
 }
 
+/** Clip radius in counter-scaled label coordinates (matches on-screen bubble size). */
+export function bubbleLabelClipRadius(radius: number, zoomScale: number): number {
+  return radius * zoomScale * 0.92;
+}
+
 /** Fit a species name inside its bubble at the current zoom level (screen pixels). */
 export function fitBubbleLabel(
   commonName: string,
@@ -179,6 +216,7 @@ export function fitBubbleLabel(
   const screenRadius = radius * zoomScale;
   const maxWidth = 2 * screenRadius * LABEL_WIDTH_FACTOR;
   const maxHeight = 2 * screenRadius * LABEL_HEIGHT_FACTOR;
+  const requireFullName = zoomScale >= 1.75;
 
   if (maxWidth <= 0 || maxHeight <= 0 || !name) {
     return buildLabelLayout(["…"], LABEL_FONT_MIN, EMOJI_FONT_MIN);
@@ -191,9 +229,33 @@ export function fitBubbleLabel(
       EMOJI_FONT_MAX,
       Math.max(EMOJI_FONT_MIN, fontSize * 1.2)
     );
-    const lines = wrapWords(words, maxWidth, fontSize);
-    if (layoutFits(lines, fontSize, emojiFontSize, maxWidth, maxHeight)) {
-      return buildLabelLayout(lines, fontSize, emojiFontSize);
+
+    for (const strategy of LINE_STRATEGIES) {
+      const lines = strategy(words, maxWidth, fontSize);
+      if (!lines || lines.length === 0) continue;
+      if (requireFullName && lines.join(" ") !== name) continue;
+      if (layoutFits(lines, fontSize, emojiFontSize, maxWidth, maxHeight)) {
+        return buildLabelLayout(lines, fontSize, emojiFontSize);
+      }
+    }
+  }
+
+  if (requireFullName) {
+    for (let fontSize = LABEL_FONT_MIN; fontSize <= maxFont; fontSize += 0.5) {
+      let emojiFontSize = Math.min(
+        EMOJI_FONT_MAX,
+        Math.max(EMOJI_FONT_MIN, fontSize * 1.2)
+      );
+      const lines = oneWordPerLine(words, maxWidth, fontSize);
+      while (
+        emojiFontSize > EMOJI_FONT_MIN &&
+        !layoutFits(lines, fontSize, emojiFontSize, maxWidth, maxHeight)
+      ) {
+        emojiFontSize -= 1;
+      }
+      if (layoutFits(lines, fontSize, emojiFontSize, maxWidth, maxHeight)) {
+        return buildLabelLayout(lines, fontSize, emojiFontSize);
+      }
     }
   }
 
