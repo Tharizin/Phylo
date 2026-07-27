@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import {
   getCommunityProfileAction,
   getUserSpeciesBubbleAction,
@@ -10,7 +12,7 @@ export default async function CommunityUserPage({ params }: { params: { userId: 
   const profile = await getCommunityProfileAction(params.userId);
   if (!profile.ok) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-16">
+      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center px-4">
         <p className="text-destructive">{profile.error}</p>
       </div>
     );
@@ -23,7 +25,7 @@ export default async function CommunityUserPage({ params }: { params: { userId: 
 
   if (!bubbleRes.ok) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-16">
+      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center px-4">
         <p className="text-destructive">{bubbleRes.error}</p>
       </div>
     );
@@ -32,14 +34,12 @@ export default async function CommunityUserPage({ params }: { params: { userId: 
   if (!profile.isSelf && !viewerRes.ok) redirect("/login");
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
-      <FriendSpeciesMapView
-        username={profile.username}
-        avatarUrl={profile.avatarUrl}
-        friendNodes={bubbleRes.nodes}
-        viewerSpeciesIds={viewerRes.ok ? viewerRes.speciesIds : []}
-        isSelf={profile.isSelf}
-      />
-    </div>
+    <FriendSpeciesMapView
+      username={profile.username}
+      avatarUrl={profile.avatarUrl}
+      friendNodes={bubbleRes.nodes}
+      viewerSpeciesIds={viewerRes.ok ? viewerRes.speciesIds : []}
+      isSelf={profile.isSelf}
+    />
   );
 }

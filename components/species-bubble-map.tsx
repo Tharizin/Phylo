@@ -1,15 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as d3 from "d3";
 import {
-  bubbleRadius,
+  CANVAS_SCALE,
+  COLLISION_PADDING,
   categoryEmoji,
-  categoryFill,
-  categoryStroke,
+  readBubbleColorPalette,
+  resolveBubbleColors,
+  weightedClusterCenter,
+  bubbleRadius,
+  type BubbleColorPalette,
   type SpeciesBubbleMode,
   type SpeciesBubbleNode,
 } from "@/lib/species-bubble";
+import { MapInfoButton } from "@/components/species-bubble-map-chrome";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +37,8 @@ export function SpeciesBubbleMap({
   className,
   requireMinNodes = 3,
   emptyHint,
+  overlayControls,
+  fullscreen = true,
 }: {
   nodes: SpeciesBubbleNode[];
   mode: SpeciesBubbleMode;
@@ -39,16 +46,37 @@ export function SpeciesBubbleMap({
   className?: string;
   requireMinNodes?: number;
   emptyHint?: string;
+  overlayControls?: ReactNode;
+  fullscreen?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const [size, setSize] = useState({ width: 800, height: 560 });
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const initialViewApplied = useRef(false);
+  const [viewport, setViewport] = useState({ width: 800, height: 600 });
+  const [palette, setPalette] = useState<BubbleColorPalette>(() => readBubbleColorPalette());
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [simNodes, setSimNodes] = useState<SimNode[]>([]);
+  const [clusterCenter, setClusterCenter] = useState<{ x: number; y: number } | null>(null);
+
+  const canvas = useMemo(
+    () => ({
+      width: viewport.width * CANVAS_SCALE,
+      height: viewport.height * CANVAS_SCALE,
+    }),
+    [viewport.width, viewport.height]
+  );
 
   const counts = useMemo(() => nodes.map((n) => n.logCount), [nodes]);
   const minCount = counts.length ? Math.min(...counts) : 0;
   const maxCount = counts.length ? Math.max(...counts) : 0;
+
+  useEffect(() => {
+    setPalette(readBubbleColorPalette());
+    const observer = new MutationObserver(() => setPalette(readBubbleColorPalette()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -57,9 +85,9 @@ export function SpeciesBubbleMap({
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      setSize({
+      setViewport({
         width: Math.max(320, entry.contentRect.width),
-        height: Math.max(420, entry.contentRect.height),
+        height: Math.max(320, entry.contentRect.height),
       });
     });
     observer.observe(el);
@@ -67,16 +95,16 @@ export function SpeciesBubbleMap({
   }, []);
 
   useEffect(() => {
+    initialViewApplied.current = false;
     if (loading || nodes.length < requireMinNodes) {
       setSimNodes([]);
+      setClusterCenter(null);
       return;
     }
 
-    const width = size.width;
-    const height = size.height;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const maxRadial = Math.min(width, height) * 0.42;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const maxRadial = Math.min(canvas.width, canvas.height) * 0.38;
 
     const prepared: SimNode[] = nodes.map((node, index) => {
       const angle = (index / nodes.length) * Math.PI * 2;
@@ -84,8 +112,8 @@ export function SpeciesBubbleMap({
       return {
         ...node,
         r,
-        x: centerX + Math.cos(angle) * maxRadial * 0.35,
-        y: centerY + Math.sin(angle) * maxRadial * 0.35,
+        x: centerX + Math.cos(angle) * maxRadial * 0.2,
+        y: centerY + Math.sin(angle) * maxRadial * 0.2,
       };
     });
 
@@ -95,7 +123,10 @@ export function SpeciesBubbleMap({
       .forceSimulation(prepared)
       .force(
         "collide",
-        d3.forceCollide<SimNode>((d) => d.r + 4).iterations(3)
+        d3
+          .forceCollide<SimNode>((d) => d.r + COLLISION_PADDING)
+          .strength(1)
+          .iterations(6)
       )
       .force(
         "radial",
@@ -103,48 +134,65 @@ export function SpeciesBubbleMap({
           .forceRadial<SimNode>(
             (d) => {
               const t = d.logCount / maxLog;
-              return maxRadial * (0.25 + (1 - t) * 0.75);
+              return maxRadial * (0.15 + (1 - t) * 0.85);
             },
             centerX,
             centerY
           )
-          .strength(0.85)
+          .strength(0.9)
       )
-      .force("charge", d3.forceManyBody().strength(-18))
+      .force("charge", d3.forceManyBody().strength(-28))
       .stop();
 
-    for (let i = 0; i < 240; i += 1) simulation.tick();
+    for (let i = 0; i < 520; i += 1) simulation.tick();
 
     prepared.forEach((node) => {
-      node.x = Math.max(node.r + 8, Math.min(width - node.r - 8, node.x));
-      node.y = Math.max(node.r + 8, Math.min(height - node.r - 8, node.y));
+      node.x = Math.max(node.r + COLLISION_PADDING, Math.min(canvas.width - node.r - COLLISION_PADDING, node.x));
+      node.y = Math.max(node.r + COLLISION_PADDING, Math.min(canvas.height - node.r - COLLISION_PADDING, node.y));
     });
 
+    setClusterCenter(weightedClusterCenter(prepared));
     setSimNodes([...prepared]);
-  }, [loading, nodes, size.width, size.height, minCount, maxCount, requireMinNodes]);
+  }, [loading, nodes, canvas.width, canvas.height, minCount, maxCount, requireMinNodes]);
 
   useEffect(() => {
-    const svg = d3.select(svgRef.current);
-    if (!svgRef.current || loading || simNodes.length < requireMinNodes) return;
+    const svgEl = svgRef.current;
+    if (!svgEl || loading || simNodes.length < requireMinNodes) return;
 
+    const svg = d3.select(svgEl);
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.45, 3.5])
+      .scaleExtent([0.35, 2.5])
       .on("zoom", (event) => {
         svg.select("g.map-layer").attr("transform", event.transform.toString());
       });
 
+    zoomRef.current = zoom;
     svg.call(zoom as never);
+
+    if (!initialViewApplied.current && clusterCenter) {
+      const k = 1;
+      const tx = viewport.width / 2 - clusterCenter.x * k;
+      const ty = viewport.height / 2 - clusterCenter.y * k;
+      const transform = d3.zoomIdentity.translate(tx, ty).scale(k);
+      svg.call(zoom.transform as never, transform);
+      initialViewApplied.current = true;
+    }
+
     return () => {
       svg.on(".zoom", null);
+      zoomRef.current = null;
     };
-  }, [loading, simNodes, requireMinNodes]);
+  }, [loading, simNodes, clusterCenter, viewport.width, viewport.height, requireMinNodes]);
+
+  const shellClass = fullscreen
+    ? "fixed inset-x-0 top-14 z-0 h-[calc(100vh-3.5rem)] w-full"
+    : cn("relative w-full", className);
 
   if (loading) {
     return (
-      <div className={cn("flex h-[70vh] min-h-[420px] flex-col gap-3", className)}>
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="flex-1 rounded-xl" />
+      <div className={cn(shellClass, "bg-muted/10", className)}>
+        <Skeleton className="h-full w-full rounded-none" />
       </div>
     );
   }
@@ -153,7 +201,8 @@ export function SpeciesBubbleMap({
     return (
       <div
         className={cn(
-          "flex h-[70vh] min-h-[420px] items-center justify-center rounded-xl border border-dashed bg-muted/20 px-6 text-center",
+          shellClass,
+          "flex items-center justify-center bg-muted/10 px-6 text-center",
           className
         )}
       >
@@ -173,12 +222,20 @@ export function SpeciesBubbleMap({
   }
 
   return (
-    <div ref={containerRef} className={cn("relative h-[70vh] min-h-[420px] w-full", className)}>
-      <svg ref={svgRef} width={size.width} height={size.height} className="touch-none select-none rounded-xl border bg-muted/10">
-        <rect width={size.width} height={size.height} fill="transparent" />
+    <div ref={containerRef} className={cn(shellClass, "overflow-hidden bg-muted/10", className)}>
+      <svg
+        ref={svgRef}
+        width={viewport.width}
+        height={viewport.height}
+        className="touch-none select-none"
+        style={{ background: "hsl(var(--background))" }}
+      >
+        <rect width={viewport.width} height={viewport.height} fill="transparent" />
         <g className="map-layer">
           {simNodes.map((node) => {
             const muted = node.gapMuted ?? false;
+            const gapHighlight = node.gapHighlight ?? false;
+            const colors = resolveBubbleColors(palette, node.category, muted, gapHighlight);
             const label = node.commonName.length > 16 ? `${node.commonName.slice(0, 14)}…` : node.commonName;
             return (
               <g
@@ -201,21 +258,32 @@ export function SpeciesBubbleMap({
                 }
                 onMouseLeave={() => setTooltip(null)}
               >
+                {gapHighlight && colors.ring ? (
+                  <circle r={node.r + 4} fill="none" stroke={colors.ring} strokeWidth={3} opacity={0.95} />
+                ) : null}
                 <circle
                   r={node.r}
-                  fill={categoryFill(node.category, muted)}
-                  stroke={categoryStroke(node.category, muted)}
-                  strokeWidth={node.gapHighlight ? 3 : 2}
-                  opacity={muted ? 0.45 : 0.92}
+                  fill={colors.fill}
+                  stroke={colors.stroke}
+                  strokeWidth={colors.strokeWidth}
+                  fillOpacity={colors.fillOpacity}
                 />
-                <text textAnchor="middle" dy="-0.15em" className="pointer-events-none fill-foreground text-[15px]">
+                <text
+                  textAnchor="middle"
+                  dy="-0.15em"
+                  fill="hsl(var(--foreground))"
+                  fontSize={15}
+                  className="pointer-events-none"
+                >
                   {categoryEmoji(node.category)}
                 </text>
                 <text
                   textAnchor="middle"
                   dy="1.05em"
-                  className="pointer-events-none fill-foreground text-[11px] font-medium"
-                  style={{ fontFamily: "inherit" }}
+                  fill="hsl(var(--foreground))"
+                  fontSize={11}
+                  fontWeight={600}
+                  className="pointer-events-none"
                 >
                   {label}
                 </text>
@@ -225,7 +293,19 @@ export function SpeciesBubbleMap({
         </g>
       </svg>
 
-      <p className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-background/80 px-2 py-1 text-xs text-muted-foreground backdrop-blur">
+      <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-2">
+        <div className="pointer-events-auto">
+          <MapInfoButton mode={mode} />
+        </div>
+      </div>
+
+      {overlayControls ? (
+        <div className="pointer-events-none absolute right-3 top-3 z-10 flex flex-wrap items-center justify-end gap-2">
+          <div className="pointer-events-auto flex flex-wrap items-center gap-2">{overlayControls}</div>
+        </div>
+      ) : null}
+
+      <p className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md bg-background/75 px-2 py-1 text-xs text-muted-foreground backdrop-blur">
         Drag to pan · Scroll or pinch to zoom
       </p>
 

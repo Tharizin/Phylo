@@ -14,22 +14,11 @@ export default async function SpeciesPage() {
 
   if (!result.ok) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-16">
+      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center px-4">
         <p className="text-destructive">Could not load species map: {result.error}</p>
       </div>
     );
   }
 
-  return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-10">
-      <div>
-        <h1 className="text-3xl font-semibold">Your species map</h1>
-        <p className="mt-2 max-w-2xl text-muted-foreground">
-          Every species you&apos;ve logged, sized by how often you eat them. Favorites cluster toward the center — drag to
-          pan and scroll to zoom.
-        </p>
-      </div>
-      <PersonalSpeciesMap nodes={result.nodes} />
-    </div>
-  );
+  return <PersonalSpeciesMap nodes={result.nodes} />;
 }

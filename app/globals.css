@@ -28,6 +28,18 @@
     --radius: 0.65rem;
     --sage: 142 22% 42%;
     --sage-muted: 142 14% 72%;
+    /* Category bubble map — matches species gallery tiles (emerald / amber / violet) */
+    --bubble-plant-fill: 160 84% 39% / 0.28;
+    --bubble-plant-stroke: 160 84% 39% / 0.62;
+    --bubble-animal-fill: 32 95% 44% / 0.28;
+    --bubble-animal-stroke: 32 95% 44% / 0.62;
+    --bubble-fungus-fill: 258 90% 66% / 0.28;
+    --bubble-fungus-stroke: 258 90% 66% / 0.62;
+    --bubble-other-fill: 215 16% 47% / 0.24;
+    --bubble-other-stroke: 215 16% 47% / 0.5;
+    --bubble-muted-fill: 200 6% 70% / 0.35;
+    --bubble-muted-stroke: 200 6% 50% / 0.55;
+    --bubble-gap-ring: 142 22% 42% / 0.95;
   }
 
   .dark {
@@ -52,6 +64,17 @@
     --ring: 142 22% 48%;
     --sage: 142 22% 48%;
     --sage-muted: 142 10% 32%;
+    --bubble-plant-fill: 160 84% 39% / 0.32;
+    --bubble-plant-stroke: 160 70% 45% / 0.72;
+    --bubble-animal-fill: 32 95% 44% / 0.32;
+    --bubble-animal-stroke: 32 85% 50% / 0.72;
+    --bubble-fungus-fill: 258 90% 66% / 0.32;
+    --bubble-fungus-stroke: 258 80% 72% / 0.72;
+    --bubble-other-fill: 215 16% 47% / 0.28;
+    --bubble-other-stroke: 215 14% 55% / 0.55;
+    --bubble-muted-fill: 210 8% 28% / 0.55;
+    --bubble-muted-stroke: 40 8% 55% / 0.45;
+    --bubble-gap-ring: 142 20% 55% / 0.95;
   }
 
   * {
