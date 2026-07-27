@@ -303,7 +303,7 @@ export function SpeciesBubbleMap({
                 >
                   <text
                     textAnchor="middle"
-                    dy="-0.15em"
+                    dy={label.emojiDy}
                     fill="hsl(var(--foreground))"
                     fontSize={label.emojiFontSize}
                   >
@@ -311,12 +311,19 @@ export function SpeciesBubbleMap({
                   </text>
                   <text
                     textAnchor="middle"
-                    dy="1.05em"
                     fill="hsl(var(--foreground))"
                     fontSize={label.fontSize}
                     fontWeight={600}
                   >
-                    {label.text}
+                    {label.lines.map((line, index) => (
+                      <tspan
+                        key={`${node.speciesId}-${index}`}
+                        x={0}
+                        dy={index === 0 ? label.textStartDy : label.lineHeight}
+                      >
+                        {line}
+                      </tspan>
+                    ))}
                   </text>
                 </g>
               </g>
