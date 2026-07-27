@@ -31,6 +31,75 @@ export type BubbleColorPalette = {
 export const CANVAS_SCALE = 3;
 export const COLLISION_PADDING = 3;
 
+const LABEL_FONT_MAX = 11;
+const LABEL_FONT_MIN = 7;
+const EMOJI_FONT_MAX = 15;
+const EMOJI_FONT_MIN = 9;
+const LABEL_WIDTH_FACTOR = 0.84;
+
+export type BubbleLabelLayout = {
+  text: string;
+  fontSize: number;
+  emojiFontSize: number;
+};
+
+let measureCtx: CanvasRenderingContext2D | null = null;
+
+function getMeasureContext(): CanvasRenderingContext2D | null {
+  if (typeof document === "undefined") return null;
+  if (!measureCtx) {
+    const canvas = document.createElement("canvas");
+    measureCtx = canvas.getContext("2d");
+  }
+  return measureCtx;
+}
+
+function measureLabelWidth(text: string, fontSize: number, fontWeight = 600): number {
+  const ctx = getMeasureContext();
+  if (!ctx) return text.length * fontSize * 0.52;
+  ctx.font = `${fontWeight} ${fontSize}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+  return ctx.measureText(text).width;
+}
+
+function truncateLabelToWidth(text: string, maxWidth: number, fontSize: number): string {
+  if (measureLabelWidth(text, fontSize) <= maxWidth) return text;
+  let truncated = text;
+  while (truncated.length > 1 && measureLabelWidth(`${truncated}…`, fontSize) > maxWidth) {
+    truncated = truncated.slice(0, -1).trimEnd();
+  }
+  return truncated.length < text.length ? `${truncated}…` : truncated;
+}
+
+/** Fit a species name inside its bubble at the current zoom level (screen pixels). */
+export function fitBubbleLabel(
+  commonName: string,
+  radius: number,
+  zoomScale: number
+): BubbleLabelLayout {
+  const screenRadius = radius * zoomScale;
+  const maxWidth = 2 * screenRadius * LABEL_WIDTH_FACTOR;
+  const emojiFontSize = Math.min(
+    EMOJI_FONT_MAX,
+    Math.max(EMOJI_FONT_MIN, screenRadius * 0.34)
+  );
+
+  if (maxWidth <= 0) {
+    return { text: "…", fontSize: LABEL_FONT_MIN, emojiFontSize: EMOJI_FONT_MIN };
+  }
+
+  for (let fontSize = LABEL_FONT_MAX; fontSize >= LABEL_FONT_MIN; fontSize -= 0.5) {
+    if (measureLabelWidth(commonName, fontSize) <= maxWidth) {
+      return { text: commonName, fontSize, emojiFontSize };
+    }
+  }
+
+  return {
+    text: truncateLabelToWidth(commonName, maxWidth, LABEL_FONT_MIN),
+    fontSize: LABEL_FONT_MIN,
+    emojiFontSize,
+  };
+}
+
 const CSS_VAR_MAP: Record<string, { fill: string; stroke: string }> = {
   plant: { fill: "--bubble-plant-fill", stroke: "--bubble-plant-stroke" },
   animal: { fill: "--bubble-animal-fill", stroke: "--bubble-animal-stroke" },

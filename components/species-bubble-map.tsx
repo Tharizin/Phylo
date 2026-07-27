@@ -10,6 +10,7 @@ import {
   resolveBubbleColors,
   computeInitialViewTransform,
   bubbleRadius,
+  fitBubbleLabel,
   type BubbleColorPalette,
   type SpeciesBubbleMode,
   type SpeciesBubbleNode,
@@ -53,12 +54,15 @@ export function SpeciesBubbleMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const zoomKRef = useRef(1);
+  const zoomRafRef = useRef<number | null>(null);
   const initialViewApplied = useRef(false);
   const [viewport, setViewport] = useState({ width: 800, height: 600 });
   const [palette, setPalette] = useState<BubbleColorPalette>(() => readBubbleColorPalette());
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [simNodes, setSimNodes] = useState<SimNode[]>([]);
   const [initialViewTransform, setInitialViewTransform] = useState<ViewTransform | null>(null);
+  const [zoomK, setZoomK] = useState(1);
 
   const canvas = useMemo(
     () => ({
@@ -71,6 +75,14 @@ export function SpeciesBubbleMap({
   const counts = useMemo(() => nodes.map((n) => n.logCount), [nodes]);
   const minCount = counts.length ? Math.min(...counts) : 0;
   const maxCount = counts.length ? Math.max(...counts) : 0;
+
+  const labelLayouts = useMemo(() => {
+    const layouts = new Map<string, ReturnType<typeof fitBubbleLabel>>();
+    for (const node of simNodes) {
+      layouts.set(node.speciesId, fitBubbleLabel(node.commonName, node.r, zoomK));
+    }
+    return layouts;
+  }, [simNodes, zoomK]);
 
   useEffect(() => {
     setPalette(readBubbleColorPalette());
@@ -100,6 +112,7 @@ export function SpeciesBubbleMap({
     if (loading || nodes.length < requireMinNodes) {
       setSimNodes([]);
       setInitialViewTransform(null);
+      setZoomK(1);
       return;
     }
 
@@ -154,11 +167,21 @@ export function SpeciesBubbleMap({
     if (!svgEl || loading || simNodes.length < requireMinNodes) return;
 
     const svg = d3.select(svgEl);
+    const scheduleZoomKUpdate = (k: number) => {
+      zoomKRef.current = k;
+      if (zoomRafRef.current != null) return;
+      zoomRafRef.current = requestAnimationFrame(() => {
+        setZoomK(zoomKRef.current);
+        zoomRafRef.current = null;
+      });
+    };
+
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.35, 2.5])
       .on("zoom", (event) => {
         svg.select("g.map-layer").attr("transform", event.transform.toString());
+        scheduleZoomKUpdate(event.transform.k);
       });
 
     zoomRef.current = zoom;
@@ -168,10 +191,15 @@ export function SpeciesBubbleMap({
       const { x, y, k } = initialViewTransform;
       const transform = d3.zoomIdentity.translate(x, y).scale(k);
       svg.call(zoom.transform as never, transform);
+      scheduleZoomKUpdate(k);
       initialViewApplied.current = true;
     }
 
     return () => {
+      if (zoomRafRef.current != null) {
+        cancelAnimationFrame(zoomRafRef.current);
+        zoomRafRef.current = null;
+      }
       svg.on(".zoom", null);
       zoomRef.current = null;
     };
@@ -224,11 +252,19 @@ export function SpeciesBubbleMap({
       >
         <rect width={viewport.width} height={viewport.height} fill="transparent" />
         <g className="map-layer">
+          <defs>
+            {simNodes.map((node) => (
+              <clipPath key={`clip-${node.speciesId}`} id={`bubble-label-clip-${node.speciesId}`}>
+                <circle r={node.r * 0.92} />
+              </clipPath>
+            ))}
+          </defs>
           {simNodes.map((node) => {
             const muted = node.gapMuted ?? false;
             const gapHighlight = node.gapHighlight ?? false;
             const colors = resolveBubbleColors(palette, node.category, muted, gapHighlight);
-            const label = node.commonName.length > 16 ? `${node.commonName.slice(0, 14)}…` : node.commonName;
+            const label = labelLayouts.get(node.speciesId) ?? fitBubbleLabel(node.commonName, node.r, zoomK);
+            const textScale = 1 / zoomK;
             return (
               <g
                 key={node.speciesId}
@@ -260,25 +296,29 @@ export function SpeciesBubbleMap({
                   strokeWidth={colors.strokeWidth}
                   fillOpacity={colors.fillOpacity}
                 />
-                <text
-                  textAnchor="middle"
-                  dy="-0.15em"
-                  fill="hsl(var(--foreground))"
-                  fontSize={15}
+                <g
+                  transform={`scale(${textScale})`}
+                  clipPath={`url(#bubble-label-clip-${node.speciesId})`}
                   className="pointer-events-none"
                 >
-                  {categoryEmoji(node.category)}
-                </text>
-                <text
-                  textAnchor="middle"
-                  dy="1.05em"
-                  fill="hsl(var(--foreground))"
-                  fontSize={11}
-                  fontWeight={600}
-                  className="pointer-events-none"
-                >
-                  {label}
-                </text>
+                  <text
+                    textAnchor="middle"
+                    dy="-0.15em"
+                    fill="hsl(var(--foreground))"
+                    fontSize={label.emojiFontSize}
+                  >
+                    {categoryEmoji(node.category)}
+                  </text>
+                  <text
+                    textAnchor="middle"
+                    dy="1.05em"
+                    fill="hsl(var(--foreground))"
+                    fontSize={label.fontSize}
+                    fontWeight={600}
+                  >
+                    {label.text}
+                  </text>
+                </g>
               </g>
             );
           })}
