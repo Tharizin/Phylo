@@ -32,15 +32,7 @@ function renderParagraph(section: AboutSection["paragraphs"][number]): ReactNode
 
 export function AboutWhyItMatters() {
   return (
-    <article className="space-y-10">
-      <header className="space-y-3">
-        <h2 className="text-2xl font-semibold tracking-tight">Why does this matter?</h2>
-        <p className="max-w-3xl text-muted-foreground">
-          Phylo is built on a simple idea: eating a wider variety of species is good for you. Here&apos;s what the research
-          suggests — and where the science is still evolving.
-        </p>
-      </header>
-
+    <article className="space-y-10 border-t pt-10">
       <div className="space-y-8">
         {whyItMattersSections.map((section) => (
           <section key={section.id} className="space-y-4 border-t pt-8 first:border-t-0 first:pt-0">

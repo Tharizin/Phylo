@@ -53,6 +53,32 @@ function parseAlternativeNames(raw: string): string[] {
     .filter(Boolean);
 }
 
+async function markSuggestionApproved(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  table: "species_suggestions" | "alias_suggestions",
+  id: string,
+  reviewerNotes?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const payload = {
+    status: "approved" as const,
+    reviewed_at: new Date().toISOString(),
+    reviewer_notes: reviewerNotes?.trim() || null,
+    notified: false,
+  };
+
+  const { error } = await supabase.from(table).update(payload).eq("id", id);
+  if (!error) return { ok: true };
+
+  if (isSchemaMissingError(error.message)) {
+    const { notified: _notified, ...withoutNotified } = payload;
+    const retry = await supabase.from(table).update(withoutNotified).eq("id", id);
+    if (retry.error) return { ok: false, error: retry.error.message };
+    return { ok: true };
+  }
+
+  return { ok: false, error: error.message };
+}
+
 function normalizeName(name: string): string {
   return name.trim().toLowerCase();
 }
@@ -214,17 +240,8 @@ export async function adminApproveSpeciesSuggestionAction(input: {
 
   if (insertErr) return { ok: false, error: insertErr.message };
 
-  const { error: updateErr } = await supabase
-    .from("species_suggestions")
-    .update({
-      status: "approved",
-      reviewed_at: new Date().toISOString(),
-      reviewer_notes: input.reviewerNotes?.trim() || null,
-      notified: false,
-    })
-    .eq("id", input.id);
-
-  if (updateErr) return { ok: false, error: updateErr.message };
+  const approval = await markSuggestionApproved(supabase, "species_suggestions", input.id, input.reviewerNotes);
+  if (!approval.ok) return { ok: false, error: approval.error };
 
   revalidatePath("/admin");
   revalidatePath("/dashboard");
@@ -300,17 +317,8 @@ export async function adminApproveAliasSuggestionAction(input: {
 
   if (updateSpeciesErr) return { ok: false, error: updateSpeciesErr.message };
 
-  const { error: updateErr } = await supabase
-    .from("alias_suggestions")
-    .update({
-      status: "approved",
-      reviewed_at: new Date().toISOString(),
-      reviewer_notes: input.reviewerNotes?.trim() || null,
-      notified: false,
-    })
-    .eq("id", input.id);
-
-  if (updateErr) return { ok: false, error: updateErr.message };
+  const approval = await markSuggestionApproved(supabase, "alias_suggestions", input.id, input.reviewerNotes);
+  if (!approval.ok) return { ok: false, error: approval.error };
 
   revalidatePath("/admin");
   revalidatePath("/dashboard");

@@ -38,7 +38,8 @@ export function SiteHeader() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    async function refreshCounts() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -84,9 +85,18 @@ export function SiteHeader() {
       if (!cancelled && approvedRes.ok) {
         setApprovedSuggestionCount(pathname?.startsWith("/profile") ? 0 : approvedRes.count);
       }
-    })();
+    }
+
+    void refreshCounts();
+
+    function onFocus() {
+      void refreshCounts();
+    }
+    window.addEventListener("focus", onFocus);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", onFocus);
     };
   }, [supabase, pathname, isAuthedArea]);
 
