@@ -125,17 +125,23 @@ export function SpeciesBubbleMap({
       return {
         ...node,
         r,
-        x: centerX + (Math.random() - 0.5) * 48,
-        y: centerY + (Math.random() - 0.5) * 48,
+        x: centerX,
+        y: centerY,
       };
     });
     prepared.sort((a, b) => b.r - a.r);
 
-    const maxLog = Math.max(...prepared.map((n) => n.logCount), 1);
+    const maxR = Math.max(...prepared.map((n) => n.r), 1);
+    for (const node of prepared) {
+      const sizeRatio = node.r / maxR;
+      const jitter = 24 + (1 - sizeRatio) * 72;
+      node.x = centerX + (Math.random() - 0.5) * jitter;
+      node.y = centerY + (Math.random() - 0.5) * jitter;
+    }
 
     const simulation = d3
       .forceSimulation(prepared)
-      .force("center", d3.forceCenter(centerX, centerY).strength(0.14))
+      .force("center", d3.forceCenter(centerX, centerY).strength(0.06))
       .force(
         "collide",
         d3
@@ -145,11 +151,11 @@ export function SpeciesBubbleMap({
       )
       .force(
         "x",
-        d3.forceX<SimNode>(centerX).strength((d) => 0.012 + (d.logCount / maxLog) * 0.028)
+        d3.forceX<SimNode>(centerX).strength((d) => 0.004 + (d.r / maxR) * 0.065)
       )
       .force(
         "y",
-        d3.forceY<SimNode>(centerY).strength((d) => 0.012 + (d.logCount / maxLog) * 0.028)
+        d3.forceY<SimNode>(centerY).strength((d) => 0.004 + (d.r / maxR) * 0.065)
       )
       .alphaDecay(0.012)
       .alphaMin(0.001)

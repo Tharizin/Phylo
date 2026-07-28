@@ -179,24 +179,16 @@ export default async function DashboardPage() {
         <Card className="lg:col-span-2 border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background">
           <CardHeader className="pb-2">
             <CardDescription>This week</CardDescription>
-            <CardTitle className="text-5xl font-semibold tabular-nums text-primary sm:text-6xl">{weeklySpecies}</CardTitle>
-            <p className="text-sm text-muted-foreground">unique species logged</p>
-            <p className="text-sm font-medium text-muted-foreground">🌿 {weeklyPlantSpecies} plants this week</p>
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Badge variant="outline" className="text-xs">
-                Weekly diversity {(diversity.pct * 100).toFixed(0)}%
-              </Badge>
-              {hasDiversityBonus ? (
-                <Badge variant="outline" className="border-primary/50 text-primary text-xs">
-                  <Sparkles className="mr-1 h-3 w-3" />
-                  1.5× applied
-                </Badge>
-              ) : diversityQualified ? (
-                <span className="text-xs text-muted-foreground">Eligible for 1.5× at week end</span>
-              ) : (
-                <span className="text-xs text-muted-foreground">15% new species for 1.5× bonus</span>
-              )}
+            <div className="flex flex-wrap items-end gap-x-5 gap-y-2">
+              <CardTitle className="text-5xl font-semibold tabular-nums text-primary sm:text-6xl">
+                {weeklySpecies}
+              </CardTitle>
+              <div className="pb-1.5">
+                <p className="text-xl font-semibold tabular-nums sm:text-2xl">{weeklyPlantSpecies} plants</p>
+                <p className="text-xs text-muted-foreground">this week</p>
+              </div>
             </div>
+            <p className="text-sm text-muted-foreground">unique species logged</p>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -227,17 +219,32 @@ export default async function DashboardPage() {
             </div>
             <div>
               <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
-                All-time points
-                <StatInfoTooltip text="Your total accumulated points across all time. +2 for each new plant, fungus, or bacterium; +1 for each new animal" />
+                Weekly diversity
+                <StatInfoTooltip text="The share of this week's species that are new compared to last week. At 15% or higher, you qualify for a 1.5× point bonus applied when the week ends (Sunday midnight UTC)." />
               </p>
-              <p className="text-2xl font-semibold tabular-nums">{allTimePoints.toFixed(2)}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-semibold tabular-nums">{(diversity.pct * 100).toFixed(0)}%</p>
+                {hasDiversityBonus ? (
+                  <Badge variant="outline" className="border-primary/50 text-primary">
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    1.5× applied
+                  </Badge>
+                ) : diversityQualified ? (
+                  <span className="text-xs text-muted-foreground">Eligible at week end</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Need 15% new</span>
+                )}
+              </div>
             </div>
             <div>
               <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
-                Weekly points
-                <StatInfoTooltip text="Points earned so far this week. Resets every Sunday at midnight UTC" />
+                Weekly / all-time points
+                <StatInfoTooltip text="Weekly points reset every Sunday at midnight UTC. All-time points are your total accumulated score. +2 for each new plant, fungus, or bacterium; +1 for each new animal." />
               </p>
-              <p className="text-2xl font-semibold tabular-nums">{weeklyPoints.toFixed(2)}</p>
+              <p className="text-2xl font-semibold tabular-nums">
+                {weeklyPoints.toFixed(2)}
+                <span className="text-base font-normal text-muted-foreground"> / {allTimePoints.toFixed(2)}</span>
+              </p>
             </div>
           </CardContent>
         </Card>
