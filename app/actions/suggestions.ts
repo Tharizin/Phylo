@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { SpeciesCategoryValue } from "@/lib/categories";
 import { isSchemaMissingError } from "@/lib/supabase/errors";
 import { requireAdminProfile } from "@/lib/supabase/admin-auth";
 
@@ -155,7 +156,7 @@ function nameAlreadyListed(
 export async function submitSpeciesSuggestionAction(input: {
   commonName: string;
   latinName: string;
-  category: "plant" | "animal" | "fungus" | "other";
+  category: SpeciesCategoryValue;
   alternativeNames?: string;
   notes?: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {

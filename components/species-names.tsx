@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Beef, Leaf } from "lucide-react";
+import { Beef, Leaf, Microscope } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -26,12 +26,14 @@ const categoryIcons: Record<string, ComponentType<{ className?: string }>> = {
   plant: Leaf,
   animal: Beef,
   fungus: MushroomIcon,
+  bacterium: Microscope,
 };
 
 const categoryVariant: Record<string, "default" | "secondary" | "sage" | "outline"> = {
   plant: "sage",
   animal: "secondary",
   fungus: "outline",
+  bacterium: "outline",
   other: "secondary",
 };
 

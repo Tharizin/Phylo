@@ -9,11 +9,12 @@ const MAP_HELP: Record<SpeciesBubbleMode, string[]> = {
   personal: [
     "Circle size reflects how often you've logged that species.",
     "Species pack together in a dense cluster — pan and zoom to explore.",
-    "Colors match category: plant, animal, and fungus.",
+    "Colors match category: plant, animal, fungus, and bacterium.",
   ],
   community: [
     "Circle size reflects total logs across all Phylo users.",
     "The community catalog packs into one dense cluster — pan to explore.",
+    "Use “Show my gaps” to gray out species you've already logged.",
     "Hover a bubble for platform-wide stats.",
   ],
   friend: [

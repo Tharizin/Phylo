@@ -8,6 +8,7 @@ const categoryTileStyles: Record<string, string> = {
   plant: "bg-emerald-500/10 border-emerald-500/20",
   animal: "bg-amber-600/10 border-amber-600/20",
   fungus: "bg-violet-500/10 border-violet-500/20",
+  bacterium: "bg-cyan-600/10 border-cyan-600/20",
   other: "bg-slate-500/10 border-slate-500/20",
 };
 

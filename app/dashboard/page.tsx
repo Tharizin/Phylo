@@ -5,6 +5,7 @@ import { normalizeSpeciesJoin } from "@/lib/supabase/relations";
 import { ensureDiversityProcessedAction } from "@/app/actions/diversity";
 import { FoodLogPanel } from "@/components/food-log-panel";
 import { RecentLogs } from "@/components/recent-logs";
+import { StatInfoTooltip } from "@/components/stat-info-tooltip";
 import { UserAvatar } from "@/components/user-avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +67,19 @@ export default async function DashboardPage() {
 
   const weeklySpecies = new Set(weekLogs.map((l) => l.species_id)).size;
   const allTimeSpecies = new Set((allLogs ?? []).map((l) => l.species_id)).size;
+
+  const { data: weekLogsWithCategory } = await supabase
+    .from("food_logs")
+    .select("species_id, species ( category )")
+    .eq("user_id", user.id)
+    .gte("logged_at", wkStart.toISOString())
+    .lt("logged_at", wkEnd.toISOString());
+
+  const weeklyPlantSpecies = new Set(
+    (weekLogsWithCategory ?? [])
+      .filter((row) => normalizeSpeciesJoin(row.species).category === "plant")
+      .map((row) => row.species_id as string)
+  ).size;
 
   const weeklyPoints = weekLogs.reduce((a, l) => a + Number(l.points_awarded ?? 0), 0);
   const allTimePoints = (allLogs ?? []).reduce((a, l) => a + Number(l.points_awarded ?? 0), 0);
@@ -167,14 +181,36 @@ export default async function DashboardPage() {
             <CardDescription>This week</CardDescription>
             <CardTitle className="text-5xl font-semibold tabular-nums text-primary sm:text-6xl">{weeklySpecies}</CardTitle>
             <p className="text-sm text-muted-foreground">unique species logged</p>
+            <p className="text-sm font-medium text-muted-foreground">🌿 {weeklyPlantSpecies} plants this week</p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Badge variant="outline" className="text-xs">
+                Weekly diversity {(diversity.pct * 100).toFixed(0)}%
+              </Badge>
+              {hasDiversityBonus ? (
+                <Badge variant="outline" className="border-primary/50 text-primary text-xs">
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  1.5× applied
+                </Badge>
+              ) : diversityQualified ? (
+                <span className="text-xs text-muted-foreground">Eligible for 1.5× at week end</span>
+              ) : (
+                <span className="text-xs text-muted-foreground">15% new species for 1.5× bonus</span>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">All-time species</p>
+              <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+                All-time species
+                <StatInfoTooltip text="The total number of unique species you've ever logged across all time" />
+              </p>
               <p className="text-2xl font-semibold tabular-nums">{allTimeSpecies}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Daily streak (UTC)</p>
+              <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+                Current streak
+                <StatInfoTooltip text="The number of consecutive days you've logged at least one food. Breaks if you miss a day" />
+              </p>
               <div className="flex items-center gap-2">
                 <p className="text-2xl font-semibold tabular-nums">{dailyStreak}</p>
                 {streakActive ? (
@@ -190,27 +226,18 @@ export default async function DashboardPage() {
               </div>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Weekly diversity</p>
-              <div className="flex items-center gap-2">
-                <p className="text-2xl font-semibold tabular-nums">{(diversity.pct * 100).toFixed(0)}%</p>
-                {hasDiversityBonus ? (
-                  <Badge variant="outline" className="border-primary/50 text-primary">
-                    <Sparkles className="mr-1 h-3 w-3" />
-                    1.5× applied
-                  </Badge>
-                ) : diversityQualified ? (
-                  <span className="text-xs text-muted-foreground">Eligible at week end</span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">Need 15% new</span>
-                )}
-              </div>
+              <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+                All-time points
+                <StatInfoTooltip text="Your total accumulated points across all time. +2 for each new plant, fungus, or bacterium; +1 for each new animal" />
+              </p>
+              <p className="text-2xl font-semibold tabular-nums">{allTimePoints.toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Weekly / all-time points</p>
-              <p className="text-2xl font-semibold tabular-nums">
-                {weeklyPoints.toFixed(2)}
-                <span className="text-base font-normal text-muted-foreground"> / {allTimePoints.toFixed(2)}</span>
+              <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
+                Weekly points
+                <StatInfoTooltip text="Points earned so far this week. Resets every Sunday at midnight UTC" />
               </p>
+              <p className="text-2xl font-semibold tabular-nums">{weeklyPoints.toFixed(2)}</p>
             </div>
           </CardContent>
         </Card>

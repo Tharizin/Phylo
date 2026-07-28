@@ -25,6 +25,7 @@ import { AdminManageAdmins } from "@/components/admin-manage-admins";
 import { AdminCatalogDedupe } from "@/components/admin-catalog-dedupe";
 import type { AdminProfileRow } from "@/app/actions/admin";
 import type { AliasSuggestionRow, SpeciesSuggestionRow } from "@/app/actions/suggestions";
+import { CATEGORY_OPTIONS, type SpeciesCategoryValue } from "@/lib/categories";
 import { formatDateTime } from "@/lib/time";
 
 type AdminLog = {
@@ -333,9 +334,9 @@ export function AdminPanel({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {["plant", "animal", "fungus", "other"].map((c) => (
-                    <SelectItem key={c} value={c} className="capitalize">
-                      {c}
+                  {CATEGORY_OPTIONS.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -352,7 +353,7 @@ export function AdminPanel({
                     id: editSpecies.id,
                     commonName: cn,
                     latinName: lat,
-                    category: cat as "plant" | "animal" | "fungus" | "other",
+                    category: cat as SpeciesCategoryValue,
                   });
                   if (r.ok) {
                     setEditSpecies(null);

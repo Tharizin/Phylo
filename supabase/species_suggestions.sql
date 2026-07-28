@@ -8,7 +8,7 @@ create table if not exists public.species_suggestions (
   submitted_by uuid not null references public.profiles (id) on delete cascade,
   common_name text not null,
   latin_name text,
-  category text not null check (category in ('plant', 'animal', 'fungus', 'other')),
+  category text not null check (category in ('plant', 'animal', 'fungus', 'bacterium', 'other')),
   alternative_names text[] not null default '{}',
   notes text,
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),

@@ -38,13 +38,7 @@ import { Separator } from "@/components/ui/separator";
 import { SpeciesNames } from "@/components/species-names";
 import { NewSpeciesCelebration } from "@/components/new-species-celebration";
 import { toast } from "@/components/ui/use-toast";
-
-const categoryOptions = [
-  { value: "plant", label: "Plant" },
-  { value: "animal", label: "Animal" },
-  { value: "fungus", label: "Fungus" },
-  { value: "other", label: "Other" },
-] as const;
+import { CATEGORY_OPTIONS, type SpeciesCategoryValue } from "@/lib/categories";
 
 export function FoodLogPanel() {
   const [open, setOpen] = useState(false);
@@ -67,7 +61,7 @@ export function FoodLogPanel() {
   const [newCommon, setNewCommon] = useState("");
   const [newLatin, setNewLatin] = useState("");
   const [newAltNames, setNewAltNames] = useState("");
-  const [newCategory, setNewCategory] = useState<(typeof categoryOptions)[number]["value"]>("plant");
+  const [newCategory, setNewCategory] = useState<SpeciesCategoryValue>("plant");
   const [suggestionNotes, setSuggestionNotes] = useState("");
   const [submittingSpecies, setSubmittingSpecies] = useState(false);
   const [latinNameConflict, setLatinNameConflict] = useState<string | null>(null);
@@ -387,7 +381,7 @@ export function FoodLogPanel() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {categoryOptions.map((c) => (
+                  {CATEGORY_OPTIONS.map((c) => (
                     <SelectItem key={c.value} value={c.value}>
                       {c.label}
                     </SelectItem>

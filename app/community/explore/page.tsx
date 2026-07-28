@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
-import { getCommunitySpeciesBubbleAction } from "@/app/actions/species-map";
+import { getCommunitySpeciesBubbleAction, getViewerSpeciesIdsAction } from "@/app/actions/species-map";
 import { CommunitySpeciesMapView } from "@/components/community-species-map-view";
 
 export default async function CommunityExplorePage() {
-  const result = await getCommunitySpeciesBubbleAction();
+  const [result, viewerRes] = await Promise.all([
+    getCommunitySpeciesBubbleAction(),
+    getViewerSpeciesIdsAction(),
+  ]);
 
   if (!result.ok) {
     return (
@@ -13,5 +16,12 @@ export default async function CommunityExplorePage() {
     );
   }
 
-  return <CommunitySpeciesMapView nodes={result.nodes} />;
+  if (!viewerRes.ok) redirect("/login");
+
+  return (
+    <CommunitySpeciesMapView
+      nodes={result.nodes}
+      viewerSpeciesIds={viewerRes.speciesIds}
+    />
+  );
 }

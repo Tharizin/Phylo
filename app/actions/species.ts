@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSchemaMissingError } from "@/lib/supabase/errors";
+import type { SpeciesCategoryValue } from "@/lib/categories";
 import { requireAdminProfile } from "@/lib/supabase/admin-auth";
 import { rankSpeciesSearchResults, isExactSpeciesNameMatch } from "@/lib/species-search";
 
@@ -208,7 +209,7 @@ export async function addAlternativeNameAction(
 export async function createSpeciesAction(input: {
   commonName: string;
   latinName: string;
-  category: "plant" | "animal" | "fungus" | "other";
+  category: SpeciesCategoryValue;
   alternativeNames?: string;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const supabase = await createClient();
@@ -284,7 +285,7 @@ export async function adminUpdateSpeciesAction(input: {
   id: string;
   commonName?: string;
   latinName?: string | null;
-  category?: "plant" | "animal" | "fungus" | "other";
+  category?: SpeciesCategoryValue;
   alternativeNames?: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();

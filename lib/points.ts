@@ -1,6 +1,6 @@
 import { startOfUtcDay } from "./time";
 
-export type SpeciesCategory = "plant" | "animal" | "fungus" | "other";
+export type SpeciesCategory = "plant" | "animal" | "fungus" | "bacterium" | "other";
 
 export type PointReason =
   | "first_ever_and_new_week"
@@ -21,7 +21,7 @@ export type PointBreakdown = {
 };
 
 function firstEverPoints(category: SpeciesCategory): number {
-  if (category === "plant" || category === "fungus") return 2;
+  if (category === "plant" || category === "fungus" || category === "bacterium") return 2;
   if (category === "animal") return 1;
   return 0;
 }
@@ -29,13 +29,13 @@ function firstEverPoints(category: SpeciesCategory): number {
 function weeklyPoints(category: SpeciesCategory, isNewThisWeek: boolean): number {
   if (!isNewThisWeek) return 0;
   if (category === "animal") return 0.05;
-  if (category === "plant" || category === "fungus" || category === "other") return 0.1;
+  if (category === "plant" || category === "fungus" || category === "bacterium" || category === "other") return 0.1;
   return 0;
 }
 
 /**
- * All-time first log: +2 plant/fungus, +1 animal
- * First log each week (UTC, Sunday reset): +0.10 plant/fungus/other, +0.05 animal
+ * All-time first log: +2 plant/fungus/bacterium, +1 animal
+ * First log each week (UTC, Sunday reset): +0.10 plant/fungus/bacterium/other, +0.05 animal
  * Repeat same species same week: 0
  * 1.25× streak multiplier when user has ≥5 consecutive UTC days with ≥1 log
  * 1.5× diversity multiplier applied retroactively at week end

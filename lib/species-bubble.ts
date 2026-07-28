@@ -23,6 +23,7 @@ export type BubbleColorPalette = {
   plant: CategoryBubbleColors;
   animal: CategoryBubbleColors;
   fungus: CategoryBubbleColors;
+  bacterium: CategoryBubbleColors;
   other: CategoryBubbleColors;
   muted: CategoryBubbleColors;
   gapRing: string;
@@ -289,6 +290,7 @@ const CSS_VAR_MAP: Record<string, { fill: string; stroke: string }> = {
   plant: { fill: "--bubble-plant-fill", stroke: "--bubble-plant-stroke" },
   animal: { fill: "--bubble-animal-fill", stroke: "--bubble-animal-stroke" },
   fungus: { fill: "--bubble-fungus-fill", stroke: "--bubble-fungus-stroke" },
+  bacterium: { fill: "--bubble-bacterium-fill", stroke: "--bubble-bacterium-stroke" },
   other: { fill: "--bubble-other-fill", stroke: "--bubble-other-stroke" },
 };
 
@@ -312,6 +314,7 @@ export function readBubbleColorPalette(): BubbleColorPalette {
     plant: build("plant"),
     animal: build("animal"),
     fungus: build("fungus"),
+    bacterium: build("bacterium"),
     other: build("other"),
     muted: {
       fill: read("--bubble-muted-fill"),
@@ -326,6 +329,7 @@ function fallbackPalette(): BubbleColorPalette {
     plant: { fill: "hsl(160 84% 39% / 0.28)", stroke: "hsl(160 84% 39% / 0.62)" },
     animal: { fill: "hsl(32 95% 44% / 0.28)", stroke: "hsl(32 95% 44% / 0.62)" },
     fungus: { fill: "hsl(258 90% 66% / 0.28)", stroke: "hsl(258 90% 66% / 0.62)" },
+    bacterium: { fill: "hsl(187 85% 43% / 0.28)", stroke: "hsl(187 85% 43% / 0.62)" },
     other: { fill: "hsl(215 16% 47% / 0.24)", stroke: "hsl(215 16% 47% / 0.5)" },
     muted: { fill: "hsl(var(--muted))", stroke: "hsl(var(--muted-foreground))" },
     gapRing: "hsl(var(--primary))",
@@ -340,6 +344,8 @@ export function categoryEmoji(category: string): string {
       return "🐔";
     case "fungus":
       return "🍄";
+    case "bacterium":
+      return "🦠";
     default:
       return "•";
   }
@@ -360,7 +366,10 @@ export function resolveBubbleColors(
   }
 
   const categoryKey =
-    category === "plant" || category === "animal" || category === "fungus"
+    category === "plant" ||
+    category === "animal" ||
+    category === "fungus" ||
+    category === "bacterium"
       ? category
       : "other";
   const base = palette[categoryKey];
@@ -381,19 +390,28 @@ export function bubbleRadius(logCount: number, minCount: number, maxCount: numbe
   return minR + t * (maxR - minR);
 }
 
+export function applyViewerGapMode(
+  nodes: SpeciesBubbleNode[],
+  viewerSpeciesIds: Set<string>,
+  showGaps: boolean,
+  highlightUnlogged = false
+): SpeciesBubbleNode[] {
+  if (!showGaps) {
+    return nodes.map((node) => ({ ...node, gapHighlight: false, gapMuted: false }));
+  }
+  return nodes.map((node) => ({
+    ...node,
+    gapHighlight: highlightUnlogged && !viewerSpeciesIds.has(node.speciesId),
+    gapMuted: viewerSpeciesIds.has(node.speciesId),
+  }));
+}
+
 export function applyFriendGapMode(
   friendNodes: SpeciesBubbleNode[],
   viewerSpeciesIds: Set<string>,
   showGaps: boolean
 ): SpeciesBubbleNode[] {
-  if (!showGaps) {
-    return friendNodes.map((node) => ({ ...node, gapHighlight: false, gapMuted: false }));
-  }
-  return friendNodes.map((node) => ({
-    ...node,
-    gapHighlight: !viewerSpeciesIds.has(node.speciesId),
-    gapMuted: viewerSpeciesIds.has(node.speciesId),
-  }));
+  return applyViewerGapMode(friendNodes, viewerSpeciesIds, showGaps, true);
 }
 
 export function clusterCentroid(nodes: { x: number; y: number }[]): { x: number; y: number } {
